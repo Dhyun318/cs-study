@@ -651,7 +651,9 @@ const device = $('.lp-device'), nav = $('.lp-nav'), steps = [...document.querySe
 
 // 타임라인: [ms, 함수] 목록. 움직임 줄이기면 모두 바로 실행해 끝 상태 그림만 남긴다
 let timers = [];
-const play = list => RM ? list.forEach(([, f]) => f()) : list.forEach(([ms, f]) => timers.push(setTimeout(f, ms)));
+// 휴대폰 자동 재생은 빠르게(사용자 요청: 바로바로 넘어가게). 장면 안 타이밍을 SP 배로 줄인다
+const SP = matchMedia('(max-width: 959px)').matches ? .55 : 1;
+const play = list => RM ? list.forEach(([, f]) => f()) : list.forEach(([ms, f]) => timers.push(setTimeout(f, ms * SP)));
 const show = id => document.querySelectorAll('.scr').forEach(s => s.classList.toggle('on', s.id === id));
 const tap = el => { el.classList.remove('tapping'); void el.offsetWidth; el.classList.add('tapping'); };
 const fill = (segs, k, part = 0) => segs.forEach((b, i) => b.style.setProperty('--f', i < k ? 1 : i === k ? part : 0));
@@ -734,7 +736,7 @@ function setScene(n) {
 const replay = n => { cur = -1; setScene(n); };
 
 // 좁은 화면 자동 재생: 장면 움직임이 끝나면(DUR) 잠깐 멈췄다가(HOLD) 다음 장면, 5 다음은 1. 움직임 줄이기면 자동 재생 없이 점으로만
-const DUR = [0, 1100, 4100, 1700, 4000, 3400], HOLD = 1400;
+const DUR = [0, 1100, 4100, 1700, 4000, 3400].map(v => v * SP), HOLD = 500;
 let auto = false, autoT = 0;
 function autoplay(n) {
   clearTimeout(autoT); replay(n);
