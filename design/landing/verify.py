@@ -24,6 +24,13 @@
 #       하단 고정 버튼 바탕이 과목 섹션(회색) 위에서 회색 픽셀, 흰 섹션 위에서 흰 픽셀(390),
 #       줄 첫머리에 가운데점이 없고(첫 화면 한 줄) 숫자 설명 끝 줄이 한 단어만 남지 않음, 휴대폰 기능 묶음 제목이 걸음 1 위,
 #       폭 300·310(사파리 글자 확대 125% 대용)에서 섹션마다 넘침·44·대비·오류, 스플래시 사본 사진(photos/sp) 840x840·장당 80KB 이하
+# 2026-11-15 스와이프·스크롤 등장 뒤 더한 것:
+#       폰 스와이프(390, CDP 터치 흉내): 왼쪽 다음·오른쪽 이전(1 -> 5, 5 -> 1), 민 순간 손가락 방향 전환(240ms), 민 뒤 자동 재생 이어감, 멈춤 중엔 머묾,
+#       세로·짧은 가로·세로가 큰 대각선은 장면 그대로(세로는 페이지 스크롤), 움직임 줄이기는 전환 없이 장면만 바뀜.
+#       스크롤 등장(390): 화면 밖 처음 상태 -> 들어오면 움직임 시작 -> 끝 상태가 움직임 줄이기 화면(HTML 끝 상태)과 같음(글, 칸, 화살표, 블록, 글자 크기·굵기·색, 높이),
+#       움직이는 동안 높이·아래 섹션 위치 그대로, 화면 밖이면 멈추고 처음 상태(다시 들어오면 다시 재생), 숫자 0 -> 40 30 4 20(32px, #0E5CF4),
+#       과목·질문·끝이 올라오며 등장(질문 차례, 과목 카드가 글보다 늦게), 움직이는 속성은 transform·opacity(·visibility)만, 기능 제목 시차(스크롤 위치마다 transform 다름).
+#       섹션 스크린샷은 움직임이 끝난 뒤(기능 조각 2.6초, 그 밖 1초 + 움직임 멈출 때까지) 찍는다
 import io, json, pathlib, re
 from PIL import Image
 from playwright.sync_api import sync_playwright
@@ -114,14 +121,16 @@ QA = """i => { const b = document.querySelectorAll('.qa button')[i], a = documen
   return { q: b.textContent.trim(), expanded: b.getAttribute('aria-expanded'), h: Math.round(a.getBoundingClientRect().height), vis: getComputedStyle(a).visibility,
     others_open: [...document.querySelectorAll('.qa button')].filter(x => x !== b && x.getAttribute('aria-expanded') === 'true').length }; }"""
 # 글자 대비: 글이 직접 든 요소마다 글자색(조상 투명도까지 섞음) 대 가장 가까운 바탕색. 폰 미리보기와 스플래시는 그림이라 뺀다
+# 등장 움직임이 도는 중인 요소(자기나 조상에 시간 애니메이션이 돎)는 중간 투명도라 뺀다. 끝 상태는 움직임이 멈춘 뒤 다시 잰다
 CONTRAST = """() => { const lin = v => (v /= 255) <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4;
   const lum = c => .2126 * lin(c[0]) + .7152 * lin(c[1]) + .0722 * lin(c[2]), rgba = s => (s.match(/[\\d.]+/g) || []).map(Number), bad = [];
+  const moving = new Set(document.getAnimations().filter(a => a.playState === 'running' && a.timeline === document.timeline && a.effect).map(a => a.effect.target));
   for (const e of document.querySelectorAll('body *')) {
     if (e.closest('.lp-screen, #sp, svg, script, style') || ![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
     const cs = getComputedStyle(e); if (cs.visibility !== 'visible' || !e.getClientRects().length) continue;
-    let op = 1, bg = null;
-    for (let p = e; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); op *= +s.opacity; const c = rgba(s.backgroundColor); if (!bg && (c.length === 3 || c[3] > 0)) bg = c; }
-    if (op < .05) continue;  // 아직 올라오기 전
+    let op = 1, bg = null, mv = false;
+    for (let p = e; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); op *= +s.opacity; mv = mv || moving.has(p); const c = rgba(s.backgroundColor); if (!bg && (c.length === 3 || c[3] > 0)) bg = c; }
+    if (op < .05 || mv) continue;  // 아직 올라오기 전, 올라오는 중
     bg = (bg || [255, 255, 255]).slice(0, 3);
     const f = rgba(cs.color), a = (f.length > 3 ? f[3] : 1) * op, fg = [0, 1, 2].map(i => f[i] * a + bg[i] * (1 - a));
     const l1 = lum(fg), l2 = lum(bg), ratio = (Math.max(l1, l2) + .05) / (Math.min(l1, l2) + .05);
@@ -153,6 +162,80 @@ SUBJ_LINKS = """() => [...document.querySelectorAll('.lp-subj .subs > li')].map(
 STEPS_HEAD = """() => { const h = document.querySelector('.lp-steps-h'), r = h.getBoundingClientRect(), s = document.querySelector('.lp-step').getBoundingClientRect();
   return { text: h.textContent, tag: h.tagName, visible: getComputedStyle(h).display !== 'none' && r.height > 20, above_step1: r.bottom <= s.top, step_tag: document.querySelector('.lp-step h3') ? 'H3' : '' }; }"""
 SUBJ_KEYS = ['ds', 'os', 'db', 'net']
+# 움직임이 멈출 때까지(최대 3초) 기다린다: 폰 미리보기·점 줄 밖에서 시간으로 도는 애니메이션이 없을 때. 스크롤 기반(시차)은 늘 붙어 있어 뺀다
+SETTLE = """() => new Promise(r => { const t0 = performance.now();
+  const busy = () => document.getAnimations().some(a => a.playState === 'running' && a.timeline === document.timeline && a.effect && a.effect.target && !a.effect.target.closest('.lp-screen, .lp-pin'));
+  const f = () => (!busy() || performance.now() - t0 > 3000) ? r(Math.round(performance.now() - t0)) : requestAnimationFrame(f); f(); })"""
+
+# ---- 스와이프 ----
+DEV_C = "() => { const r = document.querySelector('.lp-device').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }"
+# 민 직후: 장면 번호, 폰 화면, 그 화면에 붙은 스와이프 전환(이름, 길이, 지금 가로 위치), 페이지 스크롤
+SWIPE_NOW = """() => { const on = document.querySelector('.scr.on'), a = on.getAnimations().find(x => x.animationName === 'swL' || x.animationName === 'swR');
+  return { n: [...document.querySelectorAll('.lp-dots button')].findIndex(d => d.getAttribute('aria-current') === 'step') + 1, scr: on.id,
+    anim: a ? a.animationName : '', dur: a ? a.effect.getTiming().duration : 0, tx: Math.round(new DOMMatrix(getComputedStyle(on).transform).m41),
+    sw_attr: document.querySelector('.lp-screen').dataset.sw || '', x: scrollX, y: Math.round(scrollY) }; }"""
+
+
+def swipe(cdp, pg, x0, y0, dx, dy, steps=10):
+    # 손가락을 (x0, y0) 에서 (dx, dy) 만큼 약 0.15초에 걸쳐 민다(CDP 터치: 브라우저의 스크롤·누름 판정을 그대로 거침)
+    cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': x0, 'y': y0}]})
+    for i in range(1, steps + 1):
+        pg.wait_for_timeout(12)
+        cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': x0 + dx * i / steps, 'y': y0 + dy * i / steps}]})
+    cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
+
+
+# ---- 스크롤 등장 ----
+FS = "document.querySelectorAll('.lp-frag .fs')"
+# 조각 상태: 보이는 글, 다 찬 칸, 켜진 화살표, 다 보이는 파란 블록, 보이는 글 요소마다 글자 크기·굵기·색, 조각 높이
+FRAG_SIG = """i => { const f = document.querySelectorAll('.lp-frag .fs')[i], vis = e => e.getClientRects().length && getComputedStyle(e).visibility === 'visible';
+  const styles = [...f.querySelectorAll('*')].filter(e => vis(e) && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))
+    .map(e => { const s = getComputedStyle(e); return [e.textContent.trim().slice(0, 12), s.fontSize, s.fontWeight, s.color].join('|'); });
+  return { text: f.innerText.replace(/\\s+/g, ' ').trim(), segs: [...f.querySelectorAll('.seg b')].filter(b => b.style.getPropertyValue('--f') === '1').length,
+    arrows: f.querySelectorAll('.arr.on').length, blue: [...f.querySelectorAll('.blk')].filter(b => { const s = getComputedStyle(b); return s.backgroundColor === 'rgb(97, 148, 248)' && +s.opacity === 1; }).length,
+    styles, h: f.closest('.lp-frag').offsetHeight }; }"""
+# 조각 안에서 시간으로 도는 애니메이션 수(조각 자체의 올라오기는 빼고 안쪽만)와 단계 글
+FRAG_RUN = """i => { const f = document.querySelectorAll('.lp-frag .fs')[i];
+  return { running: document.getAnimations().filter(a => a.playState === 'running' && a.timeline === document.timeline && a.effect && f.contains(a.effect.target)).length,
+    count: (f.querySelector('[data-count]') || { textContent: '' }).textContent, arrows: f.querySelectorAll('.arr.on').length }; }"""
+# 움직이는 동안 높이: 조각 5개 높이와 과목 섹션 위치(밀림이 있으면 바뀜)
+LAYOUT = "() => [...document.querySelectorAll('.lp-frag')].map(x => x.offsetHeight).concat(document.querySelector('.lp-subj').offsetTop)"
+# 화면 밖(맨 위)일 때 조각과 숫자의 처음 상태
+START_STATE = """() => { const f = [...document.querySelectorAll('.lp-frag .fs')];
+  return { f1_covered: !f[0].classList.contains('rev'), f2_segs0: [...f[1].querySelectorAll('.seg b')].every(b => b.style.getPropertyValue('--f') === '0'),
+    f3_empty: f[2].classList.contains('pre') && !f[2].classList.contains('plus'), f4_step1: f[3].querySelector('[data-count]').textContent === '5단계 중 1번째' && !f[3].querySelector('.arr.on'),
+    f5_all: !f[4].classList.contains('cf'), nums0: [...document.querySelectorAll('.nums b')].every(b => b.textContent === '0') }; }"""
+NUMS = "() => [...document.querySelectorAll('.nums b')].map(b => { const s = getComputedStyle(b); return { v: b.textContent, fs: s.fontSize, c: s.color, mw: b.style.minWidth }; })"
+NUM_FINAL = ['40', '30', '4', '20']
+# 섹션 글: 글 요소마다 글, 글자 크기·굵기·색, 섹션 안 투명도 곱
+SEC_SIG = """sel => { const r = document.querySelector(sel), out = [];
+  for (const e of r.querySelectorAll('*')) { if (!e.getClientRects().length || ![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+    let op = 1; for (let p = e; p && p !== r.parentElement; p = p.parentElement) op *= +getComputedStyle(p).opacity;
+    const s = getComputedStyle(e); out.push([e.textContent.trim().slice(0, 12), s.fontSize, s.fontWeight, s.color, op.toFixed(2)].join('|')); }
+  return out; }"""
+SECS = ['.lp-subj', '.lp-faq', '.lp-end']
+# 등장 요소(.rv) 상태: 붙었는지, 투명도, transform. 과목 카드(.qs)는 자기 투명도도
+RV = """sel => [...document.querySelectorAll(sel)].map(e => { const s = getComputedStyle(e), q = e.querySelector('.qs');
+  return { name: e.classList.contains('qa') ? 'qa' : e.closest('.subs') ? 'subj' : e.tagName.toLowerCase(), shown: e.classList.contains('shown'),
+    o: +(+s.opacity).toFixed(3), t: s.transform, qs_o: q ? +(+getComputedStyle(q).opacity).toFixed(3) : null }; })"""
+# 섹션 쪽(폰 밖)에서 움직이는 CSS 속성 이름
+ANIM_PROPS = """() => { const out = new Set();
+  for (const a of document.getAnimations()) { const t = a.effect && a.effect.target; if (!t || !t.closest('.lp-steps, .lp-subj, .lp-faq, .lp-end')) continue;
+    if (a.transitionProperty) out.add(a.transitionProperty);
+    else a.effect.getKeyframes().forEach(k => Object.keys(k).forEach(p => ['offset', 'computedOffset', 'easing', 'composite'].includes(p) || out.add(p))); }
+  return [...out]; }"""
+CENTER = "s => document.querySelector(s).scrollIntoView({ block: 'center' })"
+# 숫자 옆 단위 글(문항, 개, 과목)의 왼쪽 위치: 숫자가 올라가는 동안 안 밀려야 한다
+UNIT_X = "() => [...document.querySelectorAll('.nums .v')].map(v => { const r = document.createRange(); r.selectNodeContents(v.lastChild); return Math.round(r.getBoundingClientRect().left); })"
+
+
+def par_check(pg):
+    # 기능 제목 시차: 걸음 2 글이 화면 아래쪽(80%)에 있을 때와 위쪽(10%)에 있을 때 세로 위치(transform)가 다르다
+    top = pg.evaluate("document.querySelectorAll('.lp-step')[1].getBoundingClientRect().top + scrollY")
+    ty = "new DOMMatrix(getComputedStyle(document.querySelectorAll('.lp-step .in')[1]).transform).m42"
+    pg.evaluate(f'scrollTo(0, {top} - innerHeight * .8)'); pg.wait_for_timeout(150); low = pg.evaluate(ty)
+    pg.evaluate(f'scrollTo(0, {top} - innerHeight * .1)'); pg.wait_for_timeout(150); high = pg.evaluate(ty)
+    return {'supported': pg.evaluate("CSS.supports('animation-timeline: view()')"), 'ty_low': round(low, 1), 'ty_high': round(high, 1)}
 
 
 def lines_check(pg):
@@ -166,7 +249,7 @@ def lines_check(pg):
 
 def px(png, x, y):
     return Image.open(io.BytesIO(png)).convert('RGB').getpixel((x, y))
-SEEK = "t => document.getAnimations().forEach(a => { a.pause(); a.currentTime = t; })"
+SEEK = "t => document.getAnimations().filter(a => a.timeline === document.timeline).forEach(a => { a.pause(); a.currentTime = t; })"  # 스크롤 기반(시차)은 시간을 못 받아 뺀다
 FRAMES = [100, 400, 800, 1100, 1400]
 
 # 모두 누르기: 보이는 링크·버튼(폰 미리보기 안쪽, 스플래시 제외)에 번호와 종류를 붙인다
@@ -246,8 +329,9 @@ def press_all(b, w, h):
             # 눌림(aria-pressed true)이고 3초 동안 장면이 그대로
             seq = sample(pg, 3000); moved = url == URL and pg.evaluate(PAUSED) == 'true' and len(set(n for _, n in seq)) == 1
         elif k == 'reveal':
-            moved = url == URL and pg.evaluate("""() => { const f = document.querySelector('[data-reveal]'), a = f.querySelector('.ans');
-              return f.classList.contains('rev') && a.getBoundingClientRect().height > 20 && !f.querySelector('.recall').getClientRects().length; }""")
+            # 답이 열리고 가림 판은 안 보임(판은 높이를 지키려고 자리만 남고 숨음)
+            moved = url == URL and pg.evaluate("""() => { const f = document.querySelector('[data-reveal]'), a = f.querySelector('.ans'), c = f.querySelector('.recall');
+              return f.classList.contains('rev') && a.getBoundingClientRect().height > 20 && (!c.getClientRects().length || getComputedStyle(c).visibility === 'hidden'); }""")
         else: moved = False
         res.append({**it, 'w': round(box['width']), 'h': round(box['height']), 'on_top': top, 'pressed': look1 != look0,
                     'went': url.replace(URL.rsplit('/', 1)[0], '') + ('' if y1 is None else f' y={y1}'), 'ok': top and look1 != look0 and moved})
@@ -342,7 +426,7 @@ with sync_playwright() as pw:
         r['lines'] = lines_check(pg)
         r['steps_head'] = pg.evaluate(STEPS_HEAD); r['steps_head']['ok'] = r['steps_head']['visible'] and r['steps_head']['above_step1'] and r['steps_head']['tag'] == 'H2' and r['steps_head']['step_tag'] == 'H3'
         def look(name):
-            pg.screenshot(path=str(d / f'{name}.png'))
+            pg.evaluate(SETTLE); pg.screenshot(path=str(d / f'{name}.png'))
             r['overflow'] += pg.evaluate(OVERFLOW)
             r['low_contrast'] += pg.evaluate(CONTRAST)
             r['small_taps'] += [t for t in pg.evaluate(TAPS) if t['w'] < 44 or t['h'] < 44]
@@ -355,8 +439,8 @@ with sync_playwright() as pw:
             steps.append({**s, 'ok': s['n'] == i + 1 and s['scr'] == SCR_END[i] and s['cap'] == TITLES[i]})
         r['steps'] = steps
         # 첫 화면 아래 섹션: 기능 5개(앱 화면 조각), 숫자, 과목, 질문(첫 질문 연 것도), 끝, 맨 아래
-        for name, sel in SECTIONS_M:
-            pg.evaluate(TO_TOP, sel); pg.wait_for_timeout(700); look(name)
+        for name, sel in SECTIONS_M:  # 기능 조각은 움직임(최대 약 2.3초)이 끝난 뒤
+            pg.evaluate(TO_TOP, sel); pg.wait_for_timeout(2600 if '-feat-' in name else 1000); look(name)
         pg.evaluate(TO_TOP, '.lp-faq'); pg.wait_for_timeout(300)
         pg.locator('.qa button').first.click(); pg.wait_for_timeout(450); look('23-faq-open')
         pg.locator('.qa button').first.click(); pg.wait_for_timeout(450)
@@ -408,7 +492,7 @@ with sync_playwright() as pw:
     r['first']['ok'] = abs(r['first']['text_mid'] - r['first']['phone_mid']) <= 40 and r['first']['qr_w'] >= 80 and r['first']['qr_below_start']
     r['lines'] = lines_check(pg); r['steps_head_hidden'] = not pg.evaluate(STEPS_HEAD)['visible']
     def look(name):
-        pg.screenshot(path=str(d / f'{name}.png'))
+        pg.evaluate(SETTLE); pg.screenshot(path=str(d / f'{name}.png'))
         r['overflow'] += pg.evaluate(OVERFLOW)
         r['low_contrast'] += pg.evaluate(CONTRAST)
         r['small_taps'] += [t for t in pg.evaluate(TAPS) if t['w'] < 44 or t['h'] < 44]
@@ -421,7 +505,8 @@ with sync_playwright() as pw:
         steps.append({'step_on': s['step'], 'scr': s['scr'], 'ok': s['step'] == i and s['scr'] == SCR_END[i]})
     r['steps'] = steps
     for name, sel in SECTIONS_D:
-        pg.evaluate(TO_TOP, sel); pg.wait_for_timeout(700); look(name)
+        pg.evaluate(TO_TOP, sel); pg.wait_for_timeout(1000); look(name)
+        if name == '07-subjects': r['nums_final'] = [x['v'] for x in pg.evaluate(NUMS)] == NUM_FINAL  # 컴퓨터도 숫자가 실제 값까지
     pg.evaluate(TO_TOP, '.lp-faq'); pg.wait_for_timeout(300)
     pg.locator('.qa button').first.click(); pg.wait_for_timeout(450); look('09-faq-open')
     pg.locator('.qa button').first.click(); pg.wait_for_timeout(450)
@@ -483,7 +568,7 @@ with sync_playwright() as pw:
         nr = {'overflow': [], 'small_taps': [], 'low_contrast': [], 'scroll_w': []}
         for sel in [None, '.lp-steps-h', '.lp-step:nth-child(3)', '.lp-subj', '.lp-faq', '.lp-end']:
             if sel: pg.evaluate(TO_TOP, sel); pg.wait_for_timeout(600)
-            nr['overflow'] += pg.evaluate(OVERFLOW); nr['low_contrast'] += pg.evaluate(CONTRAST)
+            pg.evaluate(SETTLE); nr['overflow'] += pg.evaluate(OVERFLOW); nr['low_contrast'] += pg.evaluate(CONTRAST)
             nr['small_taps'] += [t for t in pg.evaluate(TAPS) if t['w'] < 44 or t['h'] < 44]; nr['scroll_w'].append(pg.evaluate('document.documentElement.scrollWidth'))
         pg.evaluate('window.scrollTo(0, 0)'); pg.wait_for_timeout(400)
         nr['pause_box'] = pg.evaluate("() => { const r = document.querySelector('.lp-pause').getBoundingClientRect(), d = document.querySelector('.lp-dots').getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), dots_right: Math.round(d.right), in_view: r.right <= innerWidth, no_overlap: r.left >= d.right - .5 }; }")
@@ -575,6 +660,135 @@ with sync_playwright() as pw:
                                  and all(x['scene'] == i + 1 and x['end_state'] and x['running'] == 0 for i, x in enumerate(rm)) and last == 5}
     ctx.close()
 
+    # ---- 폰 스와이프(390, CDP 터치 흉내) ----
+    ctx = mctx(b); errs = []; pg = watch(ctx.new_page(), errs); cdp = ctx.new_cdp_session(pg)
+    pg.goto(URL); pg.evaluate('document.fonts.ready'); pg.wait_for_timeout(600)
+    sw = {'start': pg.evaluate(NOW)['n'], 'moves': []}
+    # 장면 1 에서 왼쪽(2), 오른쪽(1), 오른쪽(1 앞은 5), 왼쪽(5 다음 1). 민 직후: 장면, 전환 이름과 길이 240ms, 새 화면 가로 위치(왼쪽 밀기는 오른쪽에서 들어와 양수), 페이지는 안 움직임
+    for name, dx, want in [('left', -120, 2), ('right', 120, 1), ('right', 120, 5), ('left', -120, 1)]:
+        x, y = pg.evaluate(DEV_C); swipe(cdp, pg, x, y, dx, 0); s = pg.evaluate(SWIPE_NOW)
+        s.update(name=name, want=want, ok=s['n'] == want and s['anim'] == ('swL' if dx < 0 else 'swR') and s['dur'] == 240
+                 and (s['tx'] > 0 if dx < 0 else s['tx'] < 0) and s['x'] == 0 and s['y'] == 0)
+        sw['moves'].append(s); pg.wait_for_timeout(350)
+    sw['attr_cleared'] = pg.evaluate("!document.querySelector('.lp-screen').dataset.sw")  # 전환이 끝나면 떼서 자동 넘김에는 안 붙음
+    # 민 뒤에도 자동 재생: 장면 1 에서 왼쪽으로 밀면 장면 2 를 끝까지(칸이 다 참) 보여 준 뒤 3
+    x, y = pg.evaluate(DEV_C); swipe(cdp, pg, x, y, -120, 0); a2 = pg.evaluate(NOW)['n']
+    pg.wait_for_timeout(NEXT_M[1] - 400); b2, full = pg.evaluate(NOW)['n'], pg.evaluate(Q_FULL)
+    pg.wait_for_timeout(900); c3 = pg.evaluate(NOW)['n']
+    sw['then_auto'] = {'after_swipe': a2, 'before_next': b2, 'segs_full': full, 'next': c3, 'ok': a2 == 2 and b2 == 2 and full and c3 == 3}
+    # 멈춤 중에 밀면 그 장면을 보여 주고 머문다(3.5초 뒤에도 그대로)
+    pg.locator('.lp-pause').tap(); x, y = pg.evaluate(DEV_C); swipe(cdp, pg, x, y, -120, 0); p1 = pg.evaluate(NOW)['n']
+    pg.wait_for_timeout(3500); p2 = pg.evaluate(NOW)['n']
+    sw['paused'] = {'pressed': pg.evaluate(PAUSED), 'after_swipe': p1, 'after_3_5s': p2, 'ok': pg.evaluate(PAUSED) == 'true' and p1 == c3 % 5 + 1 and p2 == p1}
+    # 장면 그대로여야 하는 것(멈춤 중이라 자동으로도 안 넘어감): 세로 밀기(페이지는 스크롤됨), 짧은 가로 30px, 세로가 더 큰 대각선
+    sw['ignored'] = []
+    for name, dx, dy in [('vertical', 0, -220), ('short', -30, 0), ('diagonal', -60, -90)]:
+        before = pg.evaluate(NOW)['n']; x, y = pg.evaluate(DEV_C); swipe(cdp, pg, x, y, dx, dy); pg.wait_for_timeout(600)
+        after, sy = pg.evaluate(NOW)['n'], pg.evaluate('Math.round(scrollY)')
+        sw['ignored'].append({'name': name, 'before': before, 'after': after, 'scroll_y': sy, 'ok': after == before and (sy > 0 if dy else sy == 0)})
+        for _ in range(2): pg.evaluate('scrollTo(0, 0)'); pg.wait_for_timeout(300)
+    sw['console_errors'] = errs
+    sw['ok'] = sw['start'] == 1 and all(m['ok'] for m in sw['moves']) and sw['attr_cleared'] and sw['then_auto']['ok'] and sw['paused']['ok'] and all(m['ok'] for m in sw['ignored'])
+    out['swipe_390'] = sw
+    ctx.close()
+
+    # ---- 움직임 줄이기 스와이프(390): 장면은 바뀌고(끝 상태 그림) 전환 움직임은 없음 ----
+    ctx = mctx(b, reduced_motion='reduce'); errs = []; pg = watch(ctx.new_page(), errs); cdp = ctx.new_cdp_session(pg)
+    pg.goto(URL); pg.evaluate('document.fonts.ready'); pg.wait_for_timeout(600)
+    rs = []
+    for dx, want in [(-120, 2), (120, 1), (120, 5), (-120, 1)]:
+        x, y = pg.evaluate(DEV_C); swipe(cdp, pg, x, y, dx, 0); s = pg.evaluate(SWIPE_NOW); pg.wait_for_timeout(100)
+        end, run = pg.evaluate(RM_END, want - 1), pg.evaluate(RUNNING)
+        rs.append({**s, 'want': want, 'end_state': end, 'running': run, 'ok': s['n'] == want and not s['anim'] and not s['sw_attr'] and s['tx'] == 0 and end and run == 0})
+    out['swipe_rm_390'] = {'moves': rs, 'console_errors': errs, 'ok': all(x['ok'] for x in rs)}
+    ctx.close()
+
+    # ---- 스크롤 등장, 움직임 줄이기(390): 처음부터 끝 상태(숫자 실제 값, 조각 끝 그림, 등장 요소 다 보임), 움직임 0, 시차 없음. 아래 비교의 기준 ----
+    ctx = mctx(b, reduced_motion='reduce'); errs = []; pg = watch(ctx.new_page(), errs)
+    pg.goto(URL); pg.evaluate('document.fonts.ready'); pg.wait_for_timeout(600)
+    rmm = {'nums_at_top': [x['v'] for x in pg.evaluate(NUMS)], 'rv_not_visible_at_top': pg.evaluate("[...document.querySelectorAll('.rv')].filter(e => getComputedStyle(e).opacity !== '1').length"),
+           'frags_running': []}
+    ref_frags, ref_secs = [], {}
+    for i in range(5):
+        pg.evaluate(f"{FS}[{i}].scrollIntoView({{ block: 'center' }})"); pg.wait_for_timeout(150)
+        if i == 0:  # 걸음 1 은 가린 상태(진짜 답 보기 버튼)가 끝 그림. 눌러 연 상태를 움직임 끝과 비교
+            rmm['f1_covered'] = pg.evaluate(f"!{FS}[0].classList.contains('rev')"); pg.evaluate(f"{FS}[0].querySelector('.recall').click()"); pg.wait_for_timeout(100)
+        ref_frags.append(pg.evaluate(FRAG_SIG, i)); rmm['frags_running'].append(pg.evaluate(FRAG_RUN, i)['running'])
+    for sel in SECS:
+        pg.evaluate(TO_TOP, sel); pg.wait_for_timeout(150); ref_secs[sel] = pg.evaluate(SEC_SIG, sel)
+    rmm['running_outside_phone'] = pg.evaluate("document.getAnimations().filter(a => a.playState === 'running' && (a.effect.getTiming().duration || 0) > 1 && !a.effect.target.closest('.lp-screen, .lp-pin')).length")
+    rmm['par'] = par_check(pg)
+    rmm['console_errors'] = errs
+    rmm['ok'] = rmm['nums_at_top'] == NUM_FINAL and rmm['rv_not_visible_at_top'] == 0 and rmm['f1_covered'] and not any(rmm['frags_running']) \
+        and rmm['running_outside_phone'] == 0 and rmm['par']['ty_low'] == 0 and rmm['par']['ty_high'] == 0
+    out['scroll_motion_rm_390'] = rmm
+    ctx.close()
+
+    # ---- 스크롤 등장(390): 화면 밖 처음 상태 -> 들어오면 움직임 -> 끝 상태가 위 기준과 같음, 높이 그대로, 화면 밖이면 멈춤, 숫자, 등장, 시차, 움직이는 속성 ----
+    ctx = mctx(b); errs = []; pg = watch(ctx.new_page(), errs)
+    pg.goto(URL); pg.evaluate('document.fonts.ready'); pg.wait_for_timeout(600)
+    sm = {'start_offscreen': pg.evaluate(START_STATE), 'frags': []}; props = set(); lay0 = pg.evaluate(LAYOUT)
+    now = lambda: pg.evaluate('performance.now()')
+    for i in range(5):
+        pg.evaluate('scrollTo(0, 0)'); pg.wait_for_timeout(250)  # 조각이 모두 화면 밖 -> 처음 상태
+        pg.evaluate(f"{FS}[{i}].scrollIntoView({{ block: 'center' }})"); t0 = now(); lays, moving, mid = [], [], None
+        for t in [150, 450, 900, 1400]:  # 들어온 뒤 이때마다: 안쪽에서 도는 애니메이션 수, 높이, 움직이는 속성
+            pg.wait_for_timeout(max(0, t - (now() - t0)))
+            if mid is None: mid = pg.evaluate(FRAG_SIG, i)
+            moving.append(pg.evaluate(FRAG_RUN, i)['running']); lays.append(pg.evaluate(LAYOUT)); props |= set(pg.evaluate(ANIM_PROPS))
+        pg.wait_for_timeout(max(0, 2800 - (now() - t0))); end = pg.evaluate(FRAG_SIG, i); lays.append(pg.evaluate(LAYOUT))
+        fr = {'step': i + 1, 'mid_text': mid['text'][:48], 'end_text': end['text'][:48], 'running_samples': moving, 'started_from_start': mid != end, 'moved': any(moving),
+              'end_same_as_rm': end == ref_frags[i], 'diff_keys': [k for k in end if end[k] != ref_frags[i][k]], 'no_shift': all(l == lay0 for l in lays)}
+        fr['ok'] = fr['started_from_start'] and fr['moved'] and fr['end_same_as_rm'] and fr['no_shift']
+        sm['frags'].append(fr)
+    # 화면 밖이면 멈춤: 걸음 4 를 1초 보다가 맨 위로 -> 안쪽 움직임 0, 처음 단계로 돌아가 2초 뒤에도 그대로. 다시 들어오면 처음부터 다시 재생해 끝 상태
+    pg.evaluate('scrollTo(0, 0)'); pg.wait_for_timeout(250)
+    pg.evaluate(f"{FS}[3].scrollIntoView({{ block: 'center' }})"); pg.wait_for_timeout(1000); seen = pg.evaluate(FRAG_RUN, 3)
+    pg.evaluate('scrollTo(0, 0)'); pg.wait_for_timeout(150); off1 = pg.evaluate(FRAG_RUN, 3); pg.wait_for_timeout(2000); off2 = pg.evaluate(FRAG_RUN, 3)
+    pg.evaluate(f"{FS}[3].scrollIntoView({{ block: 'center' }})"); pg.wait_for_timeout(150); re1 = pg.evaluate(FRAG_RUN, 3); pg.wait_for_timeout(2600); re2 = pg.evaluate(FRAG_SIG, 3)
+    sm['offscreen'] = {'while_seen': seen, 'off_150ms': off1, 'off_2s': off2, 'back_150ms': re1, 'back_end_same': re2 == ref_frags[3],
+                       'ok': seen['count'] != '5단계 중 1번째' and off1['running'] == 0 and off1['count'] == '5단계 중 1번째' and off2 == off1 and re1['count'] == '5단계 중 1번째' and re2 == ref_frags[3]}
+    # 숫자: 화면 밖이면 0, 들어오고 0.15초에 올라가는 중(끝 값 아래), 1.45초에 실제 값, 앱 글자 크기·색, 도는 동안 옆 단위 글 자리 그대로
+    pg.evaluate('scrollTo(0, 0)'); pg.wait_for_timeout(250); n0 = pg.evaluate(NUMS)
+    pg.evaluate(CENTER, '.nums'); pg.wait_for_timeout(150); n1, ux1 = pg.evaluate(NUMS), pg.evaluate(UNIT_X); pg.wait_for_timeout(1300); n2, ux2 = pg.evaluate(NUMS), pg.evaluate(UNIT_X)
+    v1 = [int(x['v']) for x in n1]
+    sm['nums'] = {'offscreen': [x['v'] for x in n0], 'at_150ms': v1, 'end': [x['v'] for x in n2], 'font': n2[0]['fs'], 'color': n2[0]['c'], 'unit_x_same': ux1 == ux2,
+                  'ok': all(x['v'] == '0' for x in n0) and any(v < int(f) for v, f in zip(v1, NUM_FINAL)) and all(v <= int(f) for v, f in zip(v1, NUM_FINAL))
+                  and [x['v'] for x in n2] == NUM_FINAL and all(x['fs'] == '32px' and x['c'] == 'rgb(14, 92, 244)' and x['mw'] == '' for x in n2) and ux1 == ux2}
+    # 시차: 걸음 2 글이 화면 아래쪽일 때 아래로, 위쪽일 때 위로 비켜 있다
+    sm['par'] = par_check(pg); sm['par']['ok'] = sm['par']['supported'] and sm['par']['ty_low'] - sm['par']['ty_high'] > 4
+    ctx.close()
+    # 과목·질문·끝 등장(새 탭): 들어오는 순간 올라오는 중(투명도 1 미만), 끝나면 투명도 1·transform 없음. 질문은 차례로, 과목 카드는 과목 글보다 늦게
+    ctx = mctx(b); pg = watch(ctx.new_page(), errs)
+    pg.goto(URL); pg.evaluate('document.fonts.ready'); pg.wait_for_timeout(600)
+    rising, stagger, trails, allsel = {}, [], [], ', '.join(s + ' .rv' for s in SECS)
+    for k in range(pg.evaluate(f"document.querySelectorAll('{allsel}').length")):  # 아직 안 올라온 것을 하나씩 화면 가운데로(함께 들어온 것도 같이 잰다)
+        st = pg.evaluate(RV, allsel)
+        if st[k]['shown']: continue
+        pg.evaluate(f"document.querySelectorAll('{allsel}')[{k}].scrollIntoView({{ block: 'center' }})")
+        pg.wait_for_timeout(60); s60 = pg.evaluate(RV, allsel); props |= set(pg.evaluate(ANIM_PROPS)); pg.wait_for_timeout(140); s200 = pg.evaluate(RV, allsel)
+        new = [j for j in range(len(st)) if not st[j]['shown'] and s200[j]['shown']]
+        for j in new:
+            rising[f'{s200[j]["name"]} {j}'] = s60[j]['o'] < .99
+            if s200[j]['qs_o'] is not None: trails.append(s200[j]['o'] > s200[j]['qs_o'])
+        qa = [j for j in new if s200[j]['name'] == 'qa']
+        if len(qa) >= 2: stagger.append(s200[qa[0]]['o'] > s200[qa[-1]]['o'])  # 함께 들어온 질문들: 먼저 것이 더 진함
+        pg.wait_for_timeout(700)
+    pg.wait_for_timeout(300); fin = pg.evaluate(RV, allsel)
+    ends = all(x['shown'] and x['o'] == 1 and x['t'] == 'none' and x['qs_o'] in (None, 1) for x in fin); total = len(fin)
+    # 섹션 끝 상태 글(숫자 포함)·글자 크기·굵기·색·투명도가 움직임 줄이기 기준과 같다
+    same = {}
+    for sel in SECS:
+        pg.evaluate(TO_TOP, sel); pg.wait_for_timeout(1300); same[sel] = pg.evaluate(SEC_SIG, sel) == ref_secs[sel]
+    sm['reveal'] = {'rising': rising, 'all_rose': len(rising) == total and all(rising.values()), 'faq_stagger': stagger, 'card_trails': trails, 'end_visible': ends, 'secs_same_as_rm': same,
+                    'ok': bool(len(rising) == total and all(rising.values()) and stagger and all(stagger) and trails and all(trails) and ends and all(same.values()))}
+    ctx.close()
+    sm['anim_props'] = sorted(props); sm['props_ok'] = props <= {'opacity', 'transform', 'visibility'}
+    sm['console_errors'] = errs
+    sm['ok'] = all(sm['start_offscreen'].values()) and all(f['ok'] for f in sm['frags']) and sm['offscreen']['ok'] and sm['nums']['ok'] and sm['par']['ok'] \
+        and sm['reveal']['ok'] and sm['props_ok']
+    out['scroll_motion_390'] = sm
+
     # ---- 기록이 있으면 시작하기 버튼 모두 이어서 공부하기, 자동 이동 없음 (390) ----
     ctx = mctx(b); pg = ctx.new_page()
     pg.goto(URL); pg.evaluate("localStorage.setItem('cs-chagok', JSON.stringify({ read: ['ds-array'], confused: [], last: null }))")
@@ -623,14 +837,20 @@ S['1440x900'] = {'first_ok': r['first']['ok'], 'low_contrast': len(r['low_contra
                  'splash_shown': r['splash']['shown'], 'scenes_ok': all(x['ok'] for x in r['steps']), 'dots_cap_hidden': r['dots_cap_hidden'],
                  'nav_cta_ok': r['nav_cta']['ok'], 'nav_samples': r['nav_cta']['samples'], 'nav_with_hero': r['nav_cta']['both_with_hero'],
                  'dock_hidden': r['dock_display'] == 'none', 'faq_ok': r['faq']['ok'], 'logo_ok': r['logo']['ok'], 'text': r['text'],
-                 'line_start_dot': r['lines']['line_start_dot'], 'num_orphans': r['lines']['num_orphans'], 'steps_head_hidden': r['steps_head_hidden']}
+                 'line_start_dot': r['lines']['line_start_dot'], 'num_orphans': r['lines']['num_orphans'], 'steps_head_hidden': r['steps_head_hidden'], 'nums_final': r['nums_final']}
 S['last_faq_390'] = out['last_faq_390']['ok']
 for k in ['autoplay_390', 'dot_then_auto_390', 'tab_hidden_390', 'phone_tap_390', 'pause_390', 'offscreen_390', 'reduced_motion_390', 'record',
-          'result_hold_390', 'dock_bg_390', 'subj_links']:
+          'result_hold_390', 'dock_bg_390', 'subj_links', 'swipe_390', 'swipe_rm_390', 'scroll_motion_390', 'scroll_motion_rm_390']:
     S[k] = out[k]['ok']
 S['result_hold_ms'] = out['result_hold_390']['hold_ms']; S['cycle_ms'] = out['result_hold_390']['cycle_ms']
+sm = out['scroll_motion_390']
+S['swipe_info'] = {'moves': [f"{m['name']} -> {m['n']} {m['anim']} {m['dur']}ms" for m in out['swipe_390']['moves']],
+                   'ignored': {m['name']: m['ok'] for m in out['swipe_390']['ignored']}, 'then_auto': out['swipe_390']['then_auto']['ok'], 'paused': out['swipe_390']['paused']['ok']}
+S['scroll_motion_info'] = {'frags': {f"step{f['step']}": f['ok'] for f in sm['frags']}, 'offscreen_stop': sm['offscreen']['ok'], 'nums': sm['nums']['ok'],
+                           'nums_at_150ms': ' '.join(map(str, sm['nums']['at_150ms'])), 'reveal': sm['reveal']['ok'], 'parallax': sm['par']['ok'], 'anim_props': ' '.join(sm['anim_props'])}
 S['other_tests'] = {'console_errors': sum(len(out[k]['console_errors']) for k in ['autoplay_390', 'dot_then_auto_390', 'tab_hidden_390', 'phone_tap_390',
-                    'pause_390', 'offscreen_390', 'last_faq_390', 'reduced_motion_390', 'result_hold_390', 'dock_bg_390'])}
+                    'pause_390', 'offscreen_390', 'last_faq_390', 'reduced_motion_390', 'result_hold_390', 'dock_bg_390',
+                    'swipe_390', 'swipe_rm_390', 'scroll_motion_390', 'scroll_motion_rm_390'])}
 # 스플래시 사본 사진: 840x840, 장당 80KB 이하(원본 photos/ 는 그대로)
 SP_FILES = [ROOT / 'photos' / 'sp' / f'photo-{i}.webp' for i in range(1, 7)]
 S['splash_sp_kb'] = [round(f.stat().st_size / 1000) if f.is_file() else 0 for f in SP_FILES]
@@ -642,7 +862,7 @@ S['press_all'] = {k: {'pressed': v['pressed_count'], 'fail': v['fail_count'], 'b
 # 실패 목록: 참이어야 할 것이 거짓이거나, 0 이어야 할 수가 0 이 아닌 항목 이름
 ZERO = {'overflow', 'small_taps', 'console_errors', 'low_contrast', 'fail', 'emdash', 'endash', 'dquote', 'line_start_dot', 'num_orphans'}
 TRUE = {'phone_ok', 'first_screen_in_view', 'page_scrolls', 'scenes_ok', 'splash_ok', 'dock_ok', 'faq_ok', 'logo_ok', 'nav_cta_hidden',
-        'first_ok', 'dots_cap_hidden', 'nav_cta_ok', 'dock_hidden', 'steps_head_ok', 'steps_head_hidden', 'scroll_w_ok', 'pause_in_view', 'pause_no_overlap'}
+        'first_ok', 'dots_cap_hidden', 'nav_cta_ok', 'dock_hidden', 'steps_head_ok', 'steps_head_hidden', 'scroll_w_ok', 'pause_in_view', 'pause_no_overlap', 'nums_final'}
 def fails(x, path=''):
     if isinstance(x, dict):
         return [f for k, v in x.items() for f in fails(v, f'{path}.{k}' if path else k)]
