@@ -313,7 +313,6 @@ def order(seq):
 out = {}
 with sync_playwright() as pw:
     b = pw.chromium.launch()
-    errs_all = []
 
     # ---- 좁은 화면: 스플래시, 첫 화면, 장면 스크린샷(점 눌러서), 로고 ----
     for w, h in MOBILE:

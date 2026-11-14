@@ -43,7 +43,6 @@ body { margin: 0; background: var(--bg); overflow-x: clip; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; border: 0; padding: 0; background: none; cursor: pointer; }
 h1, h2, h3, p, ul, ol { margin: 0; }
-em { font-style: normal; color: var(--accent-text); }
 :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
 .ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
@@ -75,7 +74,7 @@ em { font-style: normal; color: var(--accent-text); }
 .lp-nav { position: sticky; top: 0; z-index: 10; height: var(--navh); background: var(--bg); transition: box-shadow var(--micro) var(--std); }
 .lp-nav.cta-on { box-shadow: 0 1px 0 var(--line); }
 .lp-nav .in { max-width: 1200px; height: 100%; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.lp-brand { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-right: 4px; border-radius: 12px; transition: transform .16s cubic-bezier(.32,.72,0,1), opacity .16s; -webkit-tap-highlight-color: transparent; }
+.lp-brand { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-right: 4px; border-radius: 12px; transition: transform .16s cubic-bezier(.32,.72,0,1), opacity .16s; }
 a.lp-brand:active { transform: scale(.97); opacity: .7; }
 .lp-brand .mark { width: 28px; height: 28px; }
 .lp-nav .btn { min-height: 44px; padding: 0 16px; font-size: 15px; line-height: 22px; transition: opacity var(--base) var(--std), visibility 0s, transform var(--micro) var(--prs), filter var(--micro) var(--std); }
@@ -114,7 +113,7 @@ a.lp-brand:active { transform: scale(.97); opacity: .7; }
 .lp-wrap { max-width: 1120px; margin: 0 auto; }
 .lp-h2 { font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; }
 .lp-lead { margin-top: 12px; max-width: 30em; font-size: 17px; line-height: 28px; color: var(--ink-2); text-wrap: pretty; }
-.lp-subj { display: none; background: var(--band); }
+.lp-subj { background: var(--band); }
 .lp-subj .subs { list-style: none; padding: 0; margin-top: 56px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px 80px; }
 .lp-subj .subs > li { display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 16px; }
 .lp-subj img { width: 48px; height: 48px; }
@@ -153,7 +152,6 @@ a.lp-brand:active { transform: scale(.97); opacity: .7; }
 .lp-frag button.recall:active .btn { transform: scale(.97); filter: brightness(.92); }
 .lp-frag .ans:focus { outline: none; }
 .lp-frag .hero, .lp-frag .towers, .lp-frag .confsum { margin: 0 20px; }
-.lp-frag .towers { margin-top: 0; }
 .lp-frag .stg { margin: 0 20px; }
 .lp-frag .simcap { margin: 16px 20px 0; }
 .lp-frag .simcap p { margin-top: 8px; }
@@ -166,7 +164,6 @@ a.lp-brand:active { transform: scale(.97); opacity: .7; }
 /* 자주 묻는 질문: 버튼 aria-expanded 가 답 칸을 연다 */
 .lp-faq .list { margin-top: 24px; }
 .qa + .qa { box-shadow: inset 0 1px 0 var(--line); }
-.qa h3 { margin: 0; }
 .qa button { width: calc(100% + 24px); min-height: 64px; margin: 0 -12px; padding: 16px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-radius: 12px; text-align: left; font-size: 17px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; transition: background-color var(--micro) var(--std); }
 @media (hover: hover) { .qa button:hover { background-color: var(--band); } }
 .qa button:active { background-color: var(--line); } /* 누름은 올려 둠(hover)보다 한 단계 진하게 */
@@ -201,7 +198,6 @@ a.lp-brand:active { transform: scale(.97); opacity: .7; }
   .lp-step + .lp-step { margin-top: 72px; }
   .lp-step .in h3 { font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; }
   .lp-step .in p { margin-top: 8px; font-size: 17px; line-height: 28px; color: var(--ink-2); text-wrap: pretty; }
-  .lp-subj { display: block; }
   .lp-subj .subs { margin-top: 32px; grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .lp-end img { margin-bottom: 32px; }
   .lp-end .btn { margin-top: 24px; }
@@ -263,7 +259,6 @@ a.lp-brand:active { transform: scale(.97); opacity: .7; }
   .lp-sec { padding: 120px 40px; }
   .lp-h2 { font-size: 40px; line-height: 52px; }
   .lp-lead { margin-top: 16px; font-size: 19px; line-height: 32px; }
-  .lp-subj { display: block; }
   .lp-subj .nums { margin-top: 48px; padding-bottom: 48px; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px; }
   .lp-subj .nums .v { font-size: 24px; line-height: 32px; }
   .lp-subj .nums .v b { font-size: 48px; line-height: 56px; }
@@ -332,7 +327,6 @@ section.sec { padding: 24px 20px 32px; } /* .btn.sec 와 이름이 겹쳐 sectio
 .row .tx { flex: 1; min-width: 0; }
 .row .tx b { display: block; font-size: 17px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
 .row .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; color: var(--ink-3); }
-.row .ri { width: 20px; height: 20px; margin-top: 3px; color: var(--ink-2); }
 .rows { margin: 0 -20px; }
 .segc { position: relative; display: flex; height: 44px; padding: 0 4px; border-radius: 22px; background: var(--band); }
 .segc span { position: relative; z-index: 1; flex: 1; min-width: 0; height: 44px; padding: 0 8px; display: flex; align-items: center; justify-content: center; color: var(--ink-2); white-space: nowrap; }
@@ -966,8 +960,7 @@ function onHit(es) {
   es.forEach(e => e.isIntersecting ? hit.add(steps.indexOf(e.target)) : hit.delete(steps.indexOf(e.target)));
   setScene(hit.size ? Math.max(...hit) + 1 : steps[0].getBoundingClientRect().top > line ? 0 : steps.length);
 }
-// 폰 크기: 넓은 화면은 화면 높이에 맞추고, 좁은 화면은 폰 아래 점과 한 줄(98)까지 한 화면에 들어가게 폰만 줄인다.
-// 0.2 아래로는 안 줄인다(가로로 든 휴대폰처럼 아주 낮은 화면은 스크롤)
+// 폰 크기: 넓은 화면은 화면 높이에 맞춘다.
 // 좁은 화면: 폰 위(제목~시작하기)와 폰 아래(점, 한 줄)의 실제 높이를 빼고 남은 만큼. 폰 폭 120(MIN) 아래로는 안 줄이고 아래를 자른다
 const MIN = .293; // 폰 폭 120
 function fit() {
