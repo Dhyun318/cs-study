@@ -483,3 +483,7 @@ mark { color: inherit; background: linear-gradient(transparent 62%, var(--track)
 }
 /* 끝 영역이 보이면 모든 칸을 채운다 (마지막 단락은 읽기 선을 못 지나므로) */
 .seg.full i b { animation: none !important; transform: none !important; }
+
+/* 누름 반응: 머리 로고·탭, 분할 선택, 장 이동, 글자 링크도 누르는 동안 흐려진다 (2026-11-14 사용자 지적: 눌러도 반응 없음) */
+.hm .r1, .hm .r2 a, .segc button, .jump a, .lnk { transition: opacity var(--micro) var(--std); -webkit-tap-highlight-color: transparent; }
+.hm .r1:active, .hm .r2 a:active, .segc button:active, .jump a:active, .lnk:active { opacity: .55; }
