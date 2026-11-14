@@ -33,7 +33,9 @@
 html { scroll-padding-top: var(--navh); }
 body { margin: 0; background: var(--bg); overflow-x: clip; }
 a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; border: 0; padding: 0; background: none; cursor: pointer; }
 h1, h2, h3, p, ul, ol { margin: 0; }
+em { font-style: normal; color: var(--accent-text); }
 :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
 .ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
@@ -58,9 +60,9 @@ h1, h2, h3, p, ul, ol { margin: 0; }
 .btn.l { min-height: 56px; width: 100%; }
 .btn.pri { background: var(--cta); color: #fff; }
 .btn.sec { background: var(--band); color: var(--ink); }
-a.btn:active { transform: scale(.97); }
-a.btn.pri:active { filter: brightness(.92); }
-@media (hover: hover) { a.btn.pri:hover { filter: brightness(.92); } }
+:is(a, button).btn:active { transform: scale(.97); }
+:is(a, button).btn.pri:active { filter: brightness(.92); }
+@media (hover: hover) { :is(a, button).btn.pri:hover { filter: brightness(.92); } }
 
 /* ===== 랜딩 틀 ===== */
 .lp-nav { position: sticky; top: 0; z-index: 10; height: var(--navh); background: var(--bg); transition: box-shadow var(--micro) var(--std); }
@@ -81,14 +83,7 @@ a.btn.pri:active { filter: brightness(.92); }
 .js .lp-device { animation: lpIn var(--hero) var(--out) 120ms both; }
 @keyframes lpIn { from { opacity: 0; transform: translateY(16px); } }
 
-/* 좁은 화면: 한 화면 자동 재생. 폰 + 장면 점 + 지금 장면 한 줄 */
 .lp-pin { display: flex; flex-direction: column; align-items: center; padding: 20px 20px 0; }
-.lp-dots { display: flex; justify-content: center; margin-top: 8px; }
-.lp-dots button { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; background: none; cursor: pointer; }
-.lp-dots button::before { content: ""; width: 8px; height: 8px; border-radius: 4px; background: var(--ink-off); }
-.lp-dots [aria-current]::before { width: 24px; background: var(--accent-text); }
-.lp-cap { min-height: 26px; margin-top: 4px; font-size: 16px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; text-align: center; text-wrap: balance; }
-.lp-cap.swap { animation: rise var(--base) var(--out) both; }
 .lp-steps { display: none; list-style: none; margin: 0; padding: 0; }
 
 .lp-sec { padding: 72px 20px; }
@@ -103,14 +98,87 @@ a.btn.pri:active { filter: brightness(.92); }
 .lp-subj .meta { margin-top: 2px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink-3); }
 .lp-subj .tp { margin-top: 8px; font-size: 15px; line-height: 24px; color: var(--ink-2); }
 .lp-subj .brow { margin-top: 16px; grid-column: 2; }
-/* 좁은 화면의 마지막 섹션은 한 줄 안내만 */
-.lp-end { padding: 20px 20px 32px; text-align: center; }
-.lp-end .lp-h2, .lp-end .btn { display: none; }
-.lp-end .lp-lead { margin: 0 auto; font-size: 14px; line-height: 22px; color: var(--ink-3); }
+.lp-end { text-align: center; }
 .lp-foot { padding: 24px 20px 32px; box-shadow: inset 0 1px 0 var(--line); }
 .lp-foot .lp-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; color: var(--ink-3); }
 .lp-foot .lp-brand { color: var(--ink); min-height: 0; }
 .lp-foot .lp-brand .mark { width: 24px; height: 24px; }
+
+/* ===== 좁은 화면(959 이하): 오픽 온보딩처럼 한 장씩 넘기는 소개 4장. 스크롤 소개와 폰은 넓은 화면 전용 ===== */
+@media (max-width: 959.98px) {
+  .lp-story, .lp-end, .lp-foot, .lp-nav .btn { display: none; }
+  .lp-nav.cta-on { box-shadow: none; }
+}
+.ob { display: flex; flex-direction: column; max-width: 600px; height: calc(100vh - var(--navh)); height: calc(100svh - var(--navh)); min-height: 520px; margin: 0 auto; }
+.ob [hidden] { display: none; }
+.ob-track { flex: 1; min-height: 0; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+.ob-track::-webkit-scrollbar { display: none; }
+.ob-sl { flex: 0 0 100%; display: flex; flex-direction: column; scroll-snap-align: start; scroll-snap-stop: always; }
+/* 사진: 불러오면 서서히 보이고, 없거나 실패하면 앱 일러스트, 그동안은 연한 판 */
+.ob-ph { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--stage); }
+.ob-ph > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ob-ph > .ob-fb { display: none; object-fit: contain; }
+.nf > .ob-fb { display: block; }
+.js .ob-img { opacity: 0; transition: opacity var(--base) var(--std); }
+.js .ok > .ob-img { opacity: 1; }
+/* 글: 1장의 한 줄 소개는 위 여백 안에 띄워 네 장의 제목 높이를 같게 */
+.ob-tx { position: relative; flex: none; min-height: 104px; padding: 40px 20px 0; text-align: center; }
+.ob-eb { position: absolute; top: 14px; left: 0; right: 0; font-size: clamp(12px, 3.5vw, 13px); line-height: 18px; font-weight: 600; color: var(--accent-text); white-space: nowrap; }
+.ob-tx h2 { font-size: clamp(22px, 7vw, 26px); line-height: 34px; font-weight: 800; letter-spacing: -0.03em; text-wrap: balance; }
+.ob-tx p { margin-top: 8px; font-size: 15px; line-height: 22px; color: var(--ink-2); text-wrap: pretty; }
+.ob-ft { flex: none; display: flex; flex-direction: column; align-items: center; padding: 4px 20px calc(16px + env(safe-area-inset-bottom)); }
+.ob-dots { display: flex; justify-content: center; }
+.ob-dots button { width: 44px; height: 44px; display: grid; place-items: center; }
+.ob-dots button::before { content: ""; width: 8px; height: 8px; border-radius: 4px; background: var(--ink-off); transition: width var(--base) var(--out), background-color var(--base) var(--std); }
+.ob-dots [aria-current]::before { width: 24px; background: var(--accent-text); }
+.ob-skip { display: flex; align-items: center; justify-content: center; min-width: 88px; height: 44px; margin-bottom: 4px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--ink-3); }
+
+/* 사진 위에 뜬 앱 조각: 흰 카드 + 약한 그림자 한 단(오픽). 자리는 사진마다 얼굴, 손, 화면을 피해서 */
+.fl { position: absolute; z-index: 1; padding: 12px; border-radius: 16px; background: var(--bg); box-shadow: 0 4px 14px rgba(3,37,123,.12); pointer-events: none; }
+.fl .btn { min-height: 44px; font-size: 15px; line-height: 22px; border-radius: 12px; }
+/* 1장 답 가림: 답 보기를 누르면 떠올리기 판이 흐려지고(fade) 핵심이 올라온다(base) */
+.fl1 { right: 16px; bottom: 16px; width: 208px; }
+.fl1 .stk { display: grid; margin-top: 8px; }
+.fl1 .stk > * { grid-area: 1 / 1; }
+.fl1 .plate { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--band); text-align: center; font-weight: 600; }
+.fl1 .an { visibility: hidden; }
+.fl1 .core { margin-top: 4px; font-size: 15px; line-height: 24px; font-weight: 510; letter-spacing: -0.01em; }
+.fl1.fade .plate { animation: out var(--fade) var(--std) both; }
+.fl1.rev .plate { visibility: hidden; }
+.fl1.rev .an { visibility: visible; animation: rise var(--base) var(--out) both; }
+@keyframes out { to { opacity: 0; } }
+/* 2장 시뮬레이션: SYN 화살표 한 단계가 자라고 클라이언트 상태가 바뀐다 */
+.fl2 { left: 16px; right: 16px; bottom: 16px; max-width: 360px; }
+.fl2 .lane { display: grid; grid-template-columns: 84px minmax(0, 1fr) 84px; align-items: center; margin-top: 8px; padding: 8px; border-radius: 12px; background: var(--stage); }
+.fl2 .nd { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 10px; background: rgba(255,255,255,.7); box-shadow: var(--hair); }
+.fl2 .nd .ic { color: var(--ink-2); }
+.fl2 .nd b { font-size: 12px; line-height: 16px; font-weight: 600; }
+.fl2 .st { padding: 0 6px; border-radius: 6px; background: #fff; color: var(--ink-2); font-size: 12px; line-height: 18px; font-weight: 600; white-space: nowrap; }
+.fl2 .ar { position: relative; height: 48px; margin: 0 6px; }
+.fl2 .ln { position: absolute; left: 0; right: 0; bottom: 8px; height: 2px; background: var(--accent); transform-origin: 0 50%; visibility: hidden; }
+.fl2 .ln::after { content: ""; position: absolute; right: -2px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 9px solid var(--accent); }
+.fl2 .lb { position: absolute; left: 50%; top: 0; display: flex; flex-direction: column; align-items: center; padding: 1px 8px; border-radius: 6px; background: #fff; box-shadow: inset 0 0 0 1px var(--accent); white-space: nowrap; transform: translateX(-50%); visibility: hidden; }
+.fl2 .lb b { font-size: 12px; line-height: 15px; font-weight: 700; }
+.fl2 .lb small { font-size: 12px; line-height: 15px; font-weight: 600; color: var(--accent-text); }
+.fl2 .st .b, .fl2.go .st .a { display: none; }
+.fl2.go .st .b { display: inline-block; animation: pop var(--base) var(--pop) both; }
+.fl2.go .ln { visibility: visible; animation: grow var(--base) var(--out) both; }
+.fl2.go .lb { visibility: visible; animation: fromL var(--base) var(--out) both; }
+/* 3장 진도 탑: 데이터베이스 탑에 블록 하나가 쌓이고 읽음 수가 오른다(pop) */
+.fl3 { top: 16px; right: 16px; width: 164px; }
+.fl3 .towers { margin-top: 8px; }
+.fl3 .tw .stack { height: 94px; gap: 2px; }
+.fl3 .blk { height: 6px; border-radius: 3px; }
+.fl3 .tw img { width: 24px; height: 24px; margin: 6px auto 0; }
+.fl3.plus .blk[data-new] { background: var(--accent); animation: pop var(--base) var(--pop) both; }
+.fl3.plus .blk[data-new]::before { transform: none; }
+.fl3.plus .n0 { display: none; }
+.fl3.plus .n1 { display: inline-block; animation: pop var(--base) var(--pop) both; }
+/* 4장 헷갈림만: 분할 버튼이 헷갈림만 3 으로 옮겨 가고 목록이 바뀐다 */
+.fl4 { top: 16px; left: 16px; right: 16px; max-width: 360px; padding: 8px 12px 6px; }
+.fl4 .row { gap: 8px; padding: 6px 0 0; }
+.fl4 .row .gl { margin-top: 1px; }
+.fl4 .row .tx b { font-size: 15px; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 폰: 390 x 844 앱 화면을 그대로 그리고 통째로 줄인다 */
 .lp-device { --s: .5; width: calc(410px * var(--s)); height: calc(864px * var(--s)); flex: none; }
@@ -126,7 +194,7 @@ a.btn.pri:active { filter: brightness(.92); }
   .lp-sub { margin-top: 24px; font-size: 20px; line-height: 32px; }
   .lp-intro .btn { width: auto; margin-top: 40px; padding: 0 32px; }
   .lp-pin { position: sticky; top: var(--navh); grid-column: 2; grid-row: 1 / 3; align-self: start; height: calc(100vh - var(--navh)); height: calc(100svh - var(--navh)); justify-content: center; padding: 0; }
-  .lp-dots, .lp-cap { display: none; }
+  .ob { display: none; }
   .lp-steps { display: block; grid-column: 1; grid-row: 2; padding-bottom: 20vh; } /* 마지막 걸음이 가운데 와도 폰이 붙어 있게 */
   .lp-step { height: 80vh; height: 80svh; display: flex; align-items: center; }
   .lp-step .in { opacity: .28; transition: opacity var(--base) var(--std); }
@@ -389,6 +457,81 @@ mark { color: inherit; background: linear-gradient(transparent 62%, var(--track)
 </header>
 
 <main>
+  <!-- 좁은 화면: 오픽 온보딩처럼 가로로 넘기는 소개 4장. 사진 위에 실제 앱 부품 조각 하나씩 -->
+  <section class="ob" aria-label="CS 차곡 소개">
+    <div class="ob-track">
+      <article class="ob-sl" aria-label="4장 중 1번째">
+        <div class="ob-ph">
+          <img class="ob-fb" src="../v2/illustrations/hero-db.png" alt="" loading="lazy" style="object-position:50% 16%">
+          <img class="ob-img" src="photos/photo-1.webp" alt="" width="1170" height="1500" fetchpriority="high" onload="this.parentElement.classList.add('ok')" onerror="this.parentElement.classList.add('nf');this.remove()">
+          <div class="fl fl1" aria-hidden="true">
+            <p class="t-label c-a">데이터베이스 · Transaction</p>
+            <div class="stk">
+              <div class="plate"><p class="t-ui">먼저 떠올려 보세요</p><span class="btn pri" data-tap><svg class="ic"><use href="#i-eye"/></svg>답 보기<i class="tap"></i></span></div>
+              <div class="an"><p class="t-label c-a">핵심</p><p class="core c-ink"><mark>여러 쿼리를 한 작업으로 묶어, 전부 반영하거나 전부 취소한다.</mark> 이를 ACID로 보장한다.</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="ob-tx"><h1 class="ob-eb">CS 전공 40문항을 해설과 시뮬레이션으로 공부해요</h1><h2>답은 가리고 <em>먼저 떠올려요</em></h2><p>질문만 보고 떠올린 뒤 답을 열어 봐요</p></div>
+      </article>
+      <article class="ob-sl" aria-label="4장 중 2번째">
+        <div class="ob-ph">
+          <img class="ob-fb" src="../v2/illustrations/hero-net.png" alt="" loading="lazy" style="object-position:50% 16%">
+          <img class="ob-img" src="photos/photo-2.webp" alt="" width="1170" height="1500" style="object-position:50% 100%" onload="this.parentElement.classList.add('ok')" onerror="this.parentElement.classList.add('nf');this.remove()">
+          <div class="fl fl2" aria-hidden="true">
+            <p class="t-label c-a">TCP 3-way handshake</p>
+            <div class="lane">
+              <span class="nd"><svg class="ic"><use href="#i-desk"/></svg><b>클라이언트</b><span class="st"><span class="a">연결 전</span><span class="b">SYN_SENT</span></span></span>
+              <span class="ar"><span class="lb"><b>SYN</b><small>seq=100</small></span><i class="ln"></i></span>
+              <span class="nd"><svg class="ic"><use href="#i-server"/></svg><b>서버</b><span class="st">연결 전</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="ob-tx"><h2>어려운 개념은 <em>움직여 봐요</em></h2><p>시뮬레이션으로 한 단계씩 넘기며 봐요</p></div>
+      </article>
+      <article class="ob-sl" aria-label="4장 중 3번째">
+        <div class="ob-ph">
+          <img class="ob-fb" src="../v2/illustrations/hero-done.png" alt="" loading="lazy" style="object-position:50% 84%">
+          <img class="ob-img" src="photos/photo-3.webp" alt="" width="1170" height="1500" style="object-position:50% 0" onload="this.parentElement.classList.add('ok')" onerror="this.parentElement.classList.add('nf');this.remove()">
+          <div class="fl fl3" aria-hidden="true">
+            <p class="sum"><span class="t-label c-3">읽음&nbsp;</span><b class="t-title2 c-a num"><span class="n0">17</span><span class="n1">18</span></b><span class="t-label c-3 num">&nbsp;/ 40</span></p>
+            <div class="towers">
+              <span class="tw"><span class="stack" data-b="RrrrrrrrrrCu"></span><img src="../v2/illustrations/sym-ds.png" alt="" width="24" height="24"></span>
+              <span class="tw"><span class="stack" data-b="rrrriCuuuu"></span><img src="../v2/illustrations/sym-os.png" alt="" width="24" height="24"></span>
+              <span class="tw"><span class="stack" data-b="rrrnuuuuu"></span><img src="../v2/illustrations/sym-db.png" alt="" width="24" height="24"></span>
+              <span class="tw"><span class="stack" data-b="uuuuuuuuu"></span><img src="../v2/illustrations/sym-net.png" alt="" width="24" height="24"></span>
+            </div>
+          </div>
+        </div>
+        <div class="ob-tx"><h2>읽은 만큼 <em>블록이 쌓여요</em></h2><p>끝까지 읽은 문항마다 한 칸씩 올라가요</p></div>
+      </article>
+      <article class="ob-sl" aria-label="4장 중 4번째">
+        <div class="ob-ph">
+          <img class="ob-fb" src="../v2/illustrations/ill-empty-conf.png" alt="" loading="lazy" style="object-position:50% 84%">
+          <img class="ob-img" src="photos/photo-4.webp" alt="" width="1170" height="1500" style="object-position:50% 0" onload="this.parentElement.classList.add('ok')" onerror="this.parentElement.classList.add('nf');this.remove()">
+          <div class="fl fl4" aria-hidden="true">
+            <div class="segc t-ui num" style="--n:3"><span class="sel all">전체 40</span><span>빈출 20</span><span class="cnf" data-tap>헷갈림만 3<i class="tap"></i></span><i class="th"></i></div>
+            <div class="p-all">
+              <div class="row"><span class="gl done"><svg class="ic"><use href="#i-check"/></svg></span><div class="tx"><b>Array는 어떤 자료구조인가요?</b></div></div>
+              <div class="row"><span class="gl done"><svg class="ic"><use href="#i-check"/></svg></span><div class="tx"><b>Linked List에 대해서 설명해 주세요.</b></div></div>
+            </div>
+            <div class="p-conf">
+              <div class="row" style="--k:1"><span class="gl done"><svg class="ic"><use href="#i-check"/></svg></span><div class="tx"><b>Array와 Linked List를 비교해서 설명해 주세요.</b></div></div>
+              <div class="row" style="--k:2"><span class="gl"></span><div class="tx"><b>Hash table에서 collision이 발생하면 어떻게 되나요?</b></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="ob-tx"><h2>헷갈린 것만 <em>다시 모아요</em></h2><p>헷갈려요를 눌러 두면 목차에서 모아 봐요</p></div>
+      </article>
+    </div>
+    <div class="ob-ft">
+      <div class="ob-dots" role="group" aria-label="장 고르기"><button type="button" aria-label="1번째 장"></button><button type="button" aria-label="2번째 장"></button><button type="button" aria-label="3번째 장"></button><button type="button" aria-label="4번째 장"></button></div>
+      <a class="ob-skip" href="./app/">건너뛰기</a>
+      <button class="btn l pri" type="button" data-next>다음</button>
+      <a class="btn l pri" href="./app/" data-start hidden>시작하기</a>
+    </div>
+  </section>
+
   <div class="lp-story">
     <section class="lp-intro" aria-labelledby="h1">
       <h1 class="lp-h1" id="h1">CS 전공 개념을<br>휴대폰에서 차곡차곡</h1>
@@ -511,8 +654,6 @@ COMMIT;</code></pre></div>
 
         </div></div>
       </div>
-      <div class="lp-dots" role="group" aria-label="장면 고르기"><button type="button" aria-label="답 가리기"></button><button type="button" aria-label="읽은 만큼 칸"></button><button type="button" aria-label="블록 쌓기"></button><button type="button" aria-label="시뮬레이션"></button><button type="button" aria-label="헷갈림만 보기"></button></div>
-      <p class="lp-cap">답은 가려 두고, 먼저 떠올려요</p>
     </div>
 
     <ol class="lp-steps" role="list">
@@ -632,31 +773,19 @@ const SCENES = [
   },
 ];
 let cur = -1;
-const dots = [...document.querySelectorAll('.lp-dots button')], capEl = $('.lp-cap');
-const TITLES = steps.map(s => $('h2', s).textContent);
 function setScene(n) {
   if (n === cur) return;
   cur = n; timers.forEach(clearTimeout); timers = [];
   steps.forEach((s, i) => s.classList.toggle('on', i === n - 1));
-  dots.forEach((d, i) => i === n - 1 ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current'));
-  if (n && capEl.textContent !== TITLES[n - 1]) { capEl.textContent = TITLES[n - 1]; capEl.classList.remove('swap'); void capEl.offsetWidth; capEl.classList.add('swap'); }
   SCENES[n]();
 }
 const replay = n => { cur = -1; setScene(n); };
 
-// 좁은 화면 자동 재생: 장면 움직임이 끝나면(DUR) 잠깐 멈췄다가(HOLD) 다음 장면, 5 다음은 1
-const DUR = [0, 1100, 4100, 1700, 4000, 3400], HOLD = 1400;
-let auto = false, autoT = 0;
-function autoplay(n) {
-  clearTimeout(autoT); replay(n);
-  if (auto) autoT = setTimeout(() => autoplay(n % 5 + 1), DUR[n] + HOLD);
-}
-// 점을 누르면 자동 재생을 멈추고 그 장면만 보여 준다
-dots.forEach((d, i) => d.addEventListener('click', () => { auto = false; clearTimeout(autoT); replay(i + 1); }));
-// 탭이 안 보이면 멈추고, 다시 보이면 그 장면부터
+// 넓은 화면: 탭이 안 보이면 장면 움직임을 멈추고, 다시 보이면 그 장면부터
 document.addEventListener('visibilitychange', () => {
-  clearTimeout(autoT); timers.forEach(clearTimeout); timers = [];
-  if (!document.hidden) auto ? autoplay(cur) : replay(cur);
+  if (!desk.matches || cur < 0) return;
+  timers.forEach(clearTimeout); timers = [];
+  if (!document.hidden) replay(cur);
 });
 
 // 넓은 화면 장면 기준선: 화면 가운데에 걸친 걸음이 지금 장면
@@ -666,23 +795,17 @@ function onHit(es) {
   es.forEach(e => e.isIntersecting ? hit.add(steps.indexOf(e.target)) : hit.delete(steps.indexOf(e.target)));
   setScene(hit.size ? Math.max(...hit) + 1 : steps[0].getBoundingClientRect().top > line ? 0 : steps.length);
 }
-// 폰 크기: 넓은 화면은 화면 높이에, 좁은 화면은 폰 아래 점과 한 줄까지 첫 화면에 들어가게
+// 폰 크기: 넓은 화면 높이에 맞춘다 (좁은 화면은 폰 대신 넘기는 소개)
 function fit() {
-  const H = innerHeight;
-  const s = desk.matches ? Math.min(.84, (H - 136) / 864) : Math.min(.66, Math.max(.42, (H - device.offsetTop - 98) / 864));
-  device.style.setProperty('--s', s.toFixed(3));
+  if (desk.matches) device.style.setProperty('--s', Math.min(.84, (innerHeight - 136) / 864).toFixed(3));
 }
 function layout() {
-  fit();
   if (io) io.disconnect();
-  hit.clear(); clearTimeout(autoT);
-  if (desk.matches) {
-    auto = false; line = Math.round(innerHeight / 2);
-    io = new IntersectionObserver(onHit, { rootMargin: `${-line}px 0px ${line + 1 - innerHeight}px 0px` });
-    steps.forEach(s => io.observe(s));
-  } else {
-    auto = !RM; autoplay(cur > 0 ? cur : 1);
-  }
+  hit.clear();
+  if (!desk.matches) return;
+  fit(); line = Math.round(innerHeight / 2);
+  io = new IntersectionObserver(onHit, { rootMargin: `${-line}px 0px ${line + 1 - innerHeight}px 0px` });
+  steps.forEach(s => io.observe(s));
 }
 layout(); lastW = innerWidth;
 document.fonts.ready.then(fit);
@@ -691,6 +814,40 @@ addEventListener('resize', () => { if (innerWidth !== lastW) { lastW = innerWidt
 // 머리의 시작하기: 첫 화면의 시작하기가 보이는 동안은 숨겨 같은 버튼이 두 번 보이지 않게
 const nav = $('.lp-nav');
 new IntersectionObserver(([e]) => nav.classList.toggle('cta-on', !e.isIntersecting), { rootMargin: '-64px 0px 0px 0px' }).observe($('[data-hero-cta]'));
+
+// ===== 좁은 화면 소개: 가로로 넘기는 4장 (자동 넘김 없음) =====
+const track = $('.ob-track'), slides = [...document.querySelectorAll('.ob-sl')];
+const obDots = [...document.querySelectorAll('.ob-dots button')], nextBtn = $('[data-next]'), startBtn = $('[data-start]'), skip = $('.ob-skip');
+const fl = i => $('.fl', slides[i]);
+// 장마다 조각 움직임 [ms, 함수]: 끝 상태를 만드는 클래스를 차례로 붙인다
+const FL = [
+  f => [[700, () => tap($('[data-tap]', f))], [860, () => f.classList.add('fade')], [980, () => f.classList.add('rev')]],
+  f => [[500, () => f.classList.add('go')]],
+  f => [[500, () => f.classList.add('plus')]],
+  f => [[700, () => tap($('[data-tap]', f))], [860, () => f.classList.add('cf')]],
+];
+const flReset = i => fl(i).classList.remove('fade', 'rev', 'go', 'plus', 'cf');
+let obCur = -1;
+function obGo(n) {
+  if (n === obCur) return;
+  obCur = n; timers.forEach(clearTimeout); timers = [];
+  obDots.forEach((d, i) => i === n ? d.setAttribute('aria-current', 'true') : d.removeAttribute('aria-current'));
+  const last = n === slides.length - 1;
+  nextBtn.hidden = last; startBtn.hidden = !last; skip.style.visibility = last ? 'hidden' : '';
+  if (!RM) { flReset(n); void fl(n).offsetWidth; }
+  play(FL[n](fl(n)));
+}
+// 움직임 줄이기면 네 장 모두 처음부터 끝 상태
+if (RM) slides.forEach((s, i) => play(FL[i](fl(i))));
+// 60% 넘게 보이는 장이 지금 장. 완전히 벗어난 장은 처음 상태로 돌려 다시 들어올 때 움직이게
+const obIo = new IntersectionObserver(es => es.forEach(e => {
+  const i = slides.indexOf(e.target);
+  if (e.intersectionRatio >= .6) obGo(i); else if (!e.isIntersecting && !RM) flReset(i);
+}), { root: track, threshold: [0, .6] });
+slides.forEach(s => obIo.observe(s));
+const goTo = i => track.scrollTo({ left: i * track.clientWidth, behavior: RM ? 'auto' : 'smooth' });
+nextBtn.addEventListener('click', () => goTo(obCur + 1));
+obDots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
 </script>
 </body>
 </html>
