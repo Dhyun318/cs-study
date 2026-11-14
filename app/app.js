@@ -95,7 +95,7 @@ const figure = f => `<svg viewBox="0 42 390 ${D.figs[f].h - 42}" role="img" aria
 // ===== 머리 =====
 function hmain(on, title) {
   const t = (k, n) => `<a href="#/${k}" class="t-title2"${on === k ? ' aria-current="page"' : ''}><span>${n}</span></a>`;
-  return `<header class="hm"><a href="#/home" class="r1" aria-label="CS 차곡 홈">${MARK}<span class="t-row">CS 차곡</span></a><nav class="r2" aria-label="주요 화면">${t('home', '홈')}${t('toc', '목차')}${t('sims', '시뮬레이션')}<i class="ul" aria-hidden="true"></i></nav></header><div class="sent" data-sent></div>${title ? `<h1 class="sr" tabindex="-1">${title}</h1>` : ''}<div data-notes>${notes(on === 'home')}</div>`;
+  return `<header class="hm"><a href="../" class="r1" aria-label="CS 차곡 소개 페이지로">${MARK}<span class="t-row">CS 차곡</span></a><nav class="r2" aria-label="주요 화면">${t('home', '홈')}${t('toc', '목차')}${t('sims', '시뮬레이션')}<i class="ul" aria-hidden="true"></i></nav></header><div class="sent" data-sent></div>${title ? `<h1 class="sr" tabindex="-1">${title}</h1>` : ''}<div data-notes>${notes(on === 'home')}</div>`;
 }
 function hsub(k, on, progress = '', cls = '') {
   const t = (r, n) => `<a href="#/${r}" class="t-ui"${on === r ? ' aria-current="page"' : ''}>${n}</a>`;
