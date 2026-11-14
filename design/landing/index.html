@@ -68,7 +68,8 @@ em { font-style: normal; color: var(--accent-text); }
 .lp-nav { position: sticky; top: 0; z-index: 10; height: var(--navh); background: var(--bg); transition: box-shadow var(--micro) var(--std); }
 .lp-nav.cta-on { box-shadow: 0 1px 0 var(--line); }
 .lp-nav .in { max-width: 1200px; height: 100%; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.lp-brand { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-right: 4px; }
+.lp-brand { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-right: 4px; border-radius: 12px; transition: transform .16s cubic-bezier(.32,.72,0,1), opacity .16s; -webkit-tap-highlight-color: transparent; }
+a.lp-brand:active { transform: scale(.97); opacity: .7; }
 .lp-brand .mark { width: 28px; height: 28px; }
 .lp-nav .btn { min-height: 44px; padding: 0 16px; font-size: 15px; line-height: 22px; transition: opacity var(--base) var(--std), visibility 0s, transform var(--micro) var(--prs), filter var(--micro) var(--std); }
 .js .lp-nav:not(.cta-on) .btn { opacity: 0; visibility: hidden; transition: opacity var(--fade) var(--std), visibility 0s var(--fade); }
@@ -848,6 +849,8 @@ slides.forEach(s => obIo.observe(s));
 const goTo = i => track.scrollTo({ left: i * track.clientWidth, behavior: RM ? 'auto' : 'smooth' });
 nextBtn.addEventListener('click', () => goTo(obCur + 1));
 obDots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
+// 로고: 다시 불러오지 않고 첫 장과 맨 위로 돌아간다
+document.querySelector('a.lp-brand').addEventListener('click', e => { e.preventDefault(); goTo(0); window.scrollTo({ top: 0, behavior: RM ? 'auto' : 'smooth' }); });
 </script>
 </body>
 </html>
