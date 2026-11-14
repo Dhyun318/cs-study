@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B+tree 탐색과 범위 검색</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 찾는 값 + 이번 비교 */
+.cond { display: grid; gap: 2px; padding: 8px 12px; border-radius: 10px; background: var(--grey-100); }
+.cond div { display: flex; align-items: baseline; gap: 8px; }
+.cond small { flex: none; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.cond b { min-width: 0; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.cond span { min-height: 20px; font-size: 14px; font-weight: 700; color: var(--accent-text); }
+
+/* 트리 그림 (SVG) */
+.tree { display: block; width: 100%; height: auto; margin: 6px 0 2px; font-family: inherit; }
+.col { font-size: 12px; font-weight: 600; fill: var(--ink-2); text-anchor: middle; }
+.nd { fill: var(--bg); stroke: var(--grey-200); stroke-width: 1.5; }
+.nd.seen { fill: var(--grey-100); }
+.nd.on { fill: var(--blue-50); stroke: var(--blue); stroke-width: 2; }
+.kc { fill: none; stroke: var(--grey-200); stroke-width: 1; }
+.kc.hl { fill: var(--accent-text); }
+.kt { font-size: 13px; font-weight: 600; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.kt.hl { fill: #fff; }
+.eg { stroke: var(--chev); stroke-width: 1.5; }
+.eg.on { stroke: var(--accent-text); stroke-width: 2.5; }
+.lb { font-size: 12px; font-weight: 700; fill: var(--ink-2); text-anchor: middle; dominant-baseline: central; stroke: var(--bg); stroke-width: 4px; paint-order: stroke; }
+.lb.on { fill: var(--accent-text); }
+.lk { stroke: var(--chev); stroke-width: 1.5; }
+.lk.on { stroke: var(--accent-text); stroke-width: 2.5; }
+.ah { fill: var(--chev); }
+.ah.on { fill: var(--accent-text); }
+.lt { font-size: 11px; font-weight: 600; fill: var(--ink-2); dominant-baseline: central; }
+
+/* 아래 꼬리표 줄: 읽은 노드 또는 결과 */
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 30px; margin-top: 6px; }
+.chips small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.chips span { padding: 3px 9px; border-radius: 8px; border: 1px solid var(--grey-200); font-size: 13px; font-weight: 600; }
+.chips .none { border: 0; padding: 0; color: var(--mute); font-weight: 500; }
+
+/* 직접 해 보기: 이름 고르기 (input과 같은 모양) */
+.sim-sel { flex: 1; min-width: 0; height: 48px; padding: 0 12px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-sel:focus { border-color: var(--accent-text); }
+.tilde { align-self: center; color: var(--ink-2); font-weight: 700; }
+.sim-try .msg { min-height: 21px; color: var(--red); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>B+tree 탐색과 범위 검색</h1>
+  </header>
+  <a class="sim-q" data-q="04-database/9"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>Index에 B+tree를 쓰는 이유</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p data-mode="단건 검색">찾을 이름을 고르면 루트에서 리프까지 내려가는 길을 보여 줘요.</p>
+    <p data-mode="범위 검색">시작과 끝 이름을 고르면 시작 리프를 찾고, 리프 연결을 따라 읽어 가요.</p>
+    <div class="sim-row" id="row-one" data-mode="단건 검색">
+      <select class="sim-sel" id="one" aria-label="찾을 이름"></select>
+    </div>
+    <div class="sim-row" id="row-range" data-mode="범위 검색">
+      <select class="sim-sel" id="from" aria-label="시작 이름"></select>
+      <span class="tilde">~</span>
+      <select class="sim-sel" id="to" aria-label="끝 이름"></select>
+    </div>
+    <div class="sim-row">
+      <button class="sim-btn">찾기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="msg" id="msg" role="status"></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 트리: key = 이름(가나다순). 리프 4개, 리프마다 이름 3개. 리프끼리 오른쪽으로 연결
+// ponytail: 모양을 이 트리 하나로 고정(루트 1, 중간 2, 리프 4). 이름 넣기와 지우기는 지금 범위가 아님
+const LEAVES = [
+  ['강다온', '고은서', '권지후'], ['김도현', '나서윤', '노하람'],
+  ['문지호', '박유진', '서하은'], ['안재원', '윤채린', '정시우'],
+];
+const NAMES = LEAVES.flat();
+// 길 안내 키: 오른쪽 아래 노드의 가장 작은 이름. 키보다 앞이면 왼쪽, 같거나 뒤면 오른쪽
+const ROOTKEY = LEAVES[2][0];
+const SEP = [LEAVES[1][0], LEAVES[3][0]];
+
+// 그림 크기 (SVG 좌표)
+const X = { r: 0, m: 96, l: 196 }, NW = 52, CW = 48, NH = 32, TOP = 24, PITCH = 58;
+const leafY = i => TOP + PITCH * i + NH / 2;               // 리프 i의 세로 중심
+const midY = m => (leafY(2 * m) + leafY(2 * m + 1)) / 2;   // 중간 노드는 자식 둘의 가운데
+const rootY = (midY(0) + midY(1)) / 2;
+
+// 루트와 중간에서 x가 어느 쪽으로 가는지 실제로 비교해 구한다
+function route(x) {
+  const m = x < ROOTKEY ? 0 : 1, ms = x < SEP[m] ? 0 : 1;
+  return { m, ms, l: 2 * m + ms };
+}
+const cmp = (x, key, right) => `${x} ${right ? '≥' : '<'} ${key} → ${right ? '오른쪽' : '왼쪽'}`;
+
+// 단계 기본 모양: 강조할 노드, 지나온 노드, 강조할 선, 강조할 이름 칸(리프별), 강조할 리프 연결
+const st = (caption, o = {}) => ({ caption, nodes: [], seen: [], edges: [], keys: {}, links: [], cmp: '', n: 0, chips: null, ...o });
+
+// 루트에서 리프까지 내려가는 단계 4개 (단건과 범위가 같이 쓴다). x = 찾는 이름
+function walk(x, firstKey) {
+  const { m, ms, l } = route(x), e1 = 'r' + m, e2 = `m${m}-${ms}`;
+  return [
+    st('이름이 key인 B+tree예요. 루트와 중간은 길 안내, 이름은 리프에 있어요.'),
+    st('루트의 키와 비교해요. 가나다순으로 키보다 앞이면 왼쪽, 아니면 오른쪽이에요.',
+      { n: 1, nodes: ['r'], edges: [e1], cmp: cmp(x, ROOTKEY, m) }),
+    st('중간 노드에서 같은 방식으로 한 번 더 비교해요. 가야 할 리프가 정해졌어요.',
+      { n: 2, nodes: ['m' + m], seen: ['r'], edges: [e1, e2], cmp: cmp(x, SEP[m], ms) }),
+    st(firstKey, { n: 3, nodes: ['l' + l], seen: ['r', 'm' + m], edges: [e1, e2], cmp: '리프에 도착' }),
+  ];
+}
+
+// 단건 검색: 4단계 + 찾음. 아래 줄에는 읽은 노드를 쌓는다
+function oneSteps(x) {
+  const { l } = route(x), at = LEAVES[l].indexOf(x);
+  const steps = walk(x, '리프에 닿았어요. 이름은 정렬돼 있고 데이터 위치(pointer)가 붙어 있어요.');
+  steps.push({ ...steps[3], caption: '찾았어요. 읽은 노드는 3개뿐이에요. 한 건만 찾으면 hash가 더 빨라요.',
+    keys: { [l]: [at] }, cmp: '찾음', nodes: ['l' + l], pop: true });
+  return steps.map(s => ({ ...s, cond: ['찾는 이름', x], chips: { label: '읽은 노드', items: ['루트', '중간', '리프'].slice(0, s.n) } }));
+}
+
+// 범위 검색: 시작 리프를 찾은 뒤, 끝 이름을 넘을 때까지 리프를 옆으로 읽는다
+function rangeSteps(a, b) {
+  const { l } = route(a), steps = walk(a, '시작 이름이 있는 리프예요. 여기서부터 오른쪽으로 읽어요.');
+  const base = steps[3], res = [], keys = {}, links = [];
+  let leaf = l, pos = LEAVES[l].findIndex(k => k >= a);
+  steps[3] = { ...base, keys: { [l]: [pos] } };
+  while (true) {
+    const got = [];
+    let stop = false;
+    for (let j = pos; j < LEAVES[leaf].length; j++) {
+      if (LEAVES[leaf][j] > b) { stop = true; break; }
+      got.push(j);
+    }
+    res.push(...got.map(j => LEAVES[leaf][j]));
+    keys[leaf] = got;
+    const last = leaf === LEAVES.length - 1;
+    const note = got.length === 0 ? '이 리프의 첫 이름이 끝 이름보다 뒤라서 멈춰요.'
+      : stop ? '이 리프에서 읽었어요. 다음 이름이 끝보다 커서 여기서 멈춰요.'
+      : last ? '마지막 리프까지 읽었어요. 더 읽을 이름이 없어요.'
+      : LEAVES[leaf][got[got.length - 1]] === b ? '끝 이름까지 읽었어요. 다음 이름이 끝보다 큰지 옆 리프에서 봐요.'
+      : '이 리프를 다 읽었어요. 끝 이름이 아직 안 나왔어요.';
+    steps.push({ ...base, caption: note, nodes: ['l' + leaf], keys: { ...keys }, links: [...links], cmp: `읽은 이름 ${res.length}개`, pop: got.length > 0, res: [...res] });
+    if (stop || last) break;
+    links.push(leaf);
+    steps.push({ ...base, caption: '리프끼리 연결돼 있어요. 옆 리프로 가요. 루트부터 다시 내려가지 않아요.',
+      nodes: ['l' + (leaf + 1)], keys: { ...keys }, links: [...links], cmp: '다음 리프로', res: [...res] });
+    leaf++; pos = 0;
+  }
+  steps.push({ ...steps[steps.length - 1], caption: '정렬된 결과가 나왔어요. hash table은 순서가 없어서 범위를 못 훑어요.',
+    nodes: [], cmp: `결과 ${res.length}개`, pop: false });
+  return steps.map(s => ({ ...s, cond: ['찾는 범위', `${a} ~ ${b}`], chips: { label: '결과', items: s.res || [] } }));
+}
+
+// 노드 하나: 네모 + 칸 나누기 + 이름. hl = 강조할 칸 번호 목록
+function node(cls, x, cyv, keys, hl = []) {
+  const y = cyv - NH / 2, w = keys.length * (keys.length === 1 ? NW : CW);
+  const cw = w / keys.length;
+  return `<rect class="nd ${cls}" x="${x}" y="${y}" width="${w}" height="${NH}" rx="8"/>` + keys.map((k, i) => {
+    const on = hl.includes(i);
+    return (on ? `<rect class="kc hl" x="${x + i * cw + 2}" y="${y + 2}" width="${cw - 4}" height="${NH - 4}" rx="6"/>` : (i ? `<line class="kc" x1="${x + i * cw}" y1="${y + 4}" x2="${x + i * cw}" y2="${y + NH - 4}"/>` : ''))
+      + `<text class="kt${on ? ' hl' : ''}" x="${x + i * cw + cw / 2}" y="${cyv}">${k}</text>`;
+  }).join('');
+}
+
+// 그리기: 찾는 값 줄 + 트리 SVG + 아래 꼬리표 줄
+function render(s, stage) {
+  const cls = id => s.nodes.includes(id) ? 'on' : s.seen.includes(id) ? 'seen' : '';
+  // 선: 루트 -> 중간 2개, 중간 -> 리프 2개씩. 강조 안 된 것부터 그려 강조가 위에 오게 한다
+  const edges = [];
+  [0, 1].forEach(m => {
+    edges.push([`r${m}`, X.r + NW, rootY, X.m, midY(m), m ? '≥' : '<']);
+    [0, 1].forEach(ms => edges.push([`m${m}-${ms}`, X.m + NW, midY(m), X.l, leafY(2 * m + ms), ms ? '≥' : '<']));
+  });
+  const lines = edges.sort((p, q) => s.edges.includes(p[0]) - s.edges.includes(q[0])).map(([id, x1, y1, x2, y2, t]) => {
+    const on = s.edges.includes(id) ? ' on' : '';
+    return `<line class="eg${on}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><text class="lb${on}" x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2}">${t}</text>`;
+  }).join('');
+  // 리프끼리 연결: 아래로 향한 화살표
+  const links = [0, 1, 2].map(i => {
+    const on = s.links.includes(i) ? ' on' : '', x = X.l + 1.5 * CW, y1 = leafY(i) + NH / 2, y2 = leafY(i + 1) - NH / 2;
+    return `<line class="lk${on}" x1="${x}" y1="${y1}" x2="${x}" y2="${y2 - 5}"/><polygon class="ah${on}" points="${x - 4},${y2 - 6} ${x + 4},${y2 - 6} ${x},${y2}"/><text class="lt" x="${x + 10}" y="${(y1 + y2) / 2}">연결</text>`;
+  }).join('');
+  const nodes = node(cls('r'), X.r, rootY, [ROOTKEY]) + [0, 1].map(m => node(cls('m' + m), X.m, midY(m), [SEP[m]])).join('')
+    + LEAVES.map((ks, i) => node(cls('l' + i), X.l, leafY(i), ks, s.keys[i] || [])).join('');
+  const labels = [['루트', X.r + NW / 2], ['중간', X.m + NW / 2], ['리프', X.l + 1.5 * CW]].map(([t, x]) => `<text class="col" x="${x}" y="10">${t}</text>`).join('');
+  const items = s.chips.items;
+  stage.innerHTML = `
+    <div class="cond"><div><small>${s.cond[0]}</small><b>${s.cond[1]}</b></div><span class="num">${s.cmp}</span></div>
+    <svg class="tree" viewBox="0 0 ${X.l + 3 * CW} ${TOP + PITCH * 3 + NH + 4}" role="img" aria-label="B+tree 그림">${labels}${lines}${links}${nodes}</svg>
+    <div class="chips"><small>${s.chips.label}</small>${items.length ? items.map((t, i) => `<span class="num${s.pop && i === items.length - 1 ? ' sim-pop' : ''}">${t}</span>`).join('') : '<span class="none">아직 없어요</span>'}</div>`;
+}
+
+// 직접 해 보기: 이름을 고르면 그 탐색 단계를 만들어 자동 재생
+const $ = id => document.getElementById(id);
+['one', 'from', 'to'].forEach(id => NAMES.forEach(n => $(id).add(new Option(n, n))));
+$('one').value = '서하은'; $('from').value = '서하은'; $('to').value = '윤채린';
+$('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const msg = $('msg');
+  msg.textContent = '';
+  if ($('row-range').hidden) {
+    if (!NAMES.includes($('one').value)) return;
+    Sim.load(oneSteps($('one').value));
+  } else {
+    const a = $('from').value, b = $('to').value;
+    if (!NAMES.includes(a) || !NAMES.includes(b)) return;
+    // 끝이 시작보다 앞이면 범위가 비어서 막는다
+    if (a > b) { msg.textContent = '끝 이름이 시작 이름보다 앞이에요. 순서를 바꿔 골라 주세요.'; return; }
+    Sim.load(rangeSteps(a, b));
+  }
+  Sim.play(true);
+});
+
+Sim.start({ modes: { '단건 검색': oneSteps('서하은'), '범위 검색': rangeSteps('서하은', '윤채린') }, render });
+</script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queue와 Stack 넣고 빼기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 방금 한 조작: 이름(값) + 빨간 꼬리표 */
+.op { min-height: 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: 15px; font-weight: 700; }
+.op em { font-style: normal; font-size: 13px; font-weight: 700; color: var(--red); }
+.calc { font-size: 13px; font-weight: 700; color: var(--accent-text); }
+
+/* Queue: 칸 6개 한 줄. 위는 front/rear 표시, 아래는 칸 번호 */
+.qg { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 8px; }
+.mk { min-height: 28px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-size: 12px; font-weight: 700; line-height: 1.2; color: var(--accent-text); }
+.ix { text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.c { height: 48px; display: grid; place-items: center; border: 1.5px dashed var(--grey-200); border-radius: 10px; font-size: 17px; font-weight: 700; }
+.c.on { border-style: solid; background: var(--grey-100); }
+.c.hl { border-style: solid; border-color: var(--blue); background: var(--blue-50); }
+.c.bad { border-style: solid; border-color: var(--red); background: var(--red-50); }
+.c.gone { color: var(--mute); text-decoration: line-through; }
+.c.waste { background: var(--grey-100); color: var(--mute); font-size: 12px; font-weight: 600; }
+
+/* Stack: 위가 열린 통. 왼쪽에 top 표시 */
+.sw { display: flex; justify-content: center; margin-top: 8px; }
+.stk { display: flex; gap: 8px; }
+.tp, .sbox { display: flex; flex-direction: column; gap: 4px; }
+.tp { width: 36px; }
+.tp span { height: 34px; display: flex; align-items: center; justify-content: flex-end; font-size: 12px; font-weight: 700; color: var(--accent-text); }
+.sbox { width: 140px; padding: 0 6px 6px; border: 3px solid var(--grey-800); border-top: 0; border-radius: 0 0 12px 12px; }
+.sbox .c { height: 34px; font-size: 16px; }
+
+/* 나가는 순서 */
+.ord { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 44px; margin-top: 12px; padding: 8px 12px; border: 1.5px dashed var(--grey-200); border-radius: 12px; font-size: 15px; font-weight: 700; }
+.ord small { width: 100%; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.ord b { color: var(--accent-text); }
+
+/* 직접 해 보기: 입력은 한 줄, 버튼은 아래 줄 */
+.sim-row { flex-wrap: wrap; }
+.sim-row input { flex: 1 1 100%; }
+.sim-row .sim-btn { flex: 1; padding: 0 8px; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Queue와 Stack 넣고 빼기</h1>
+  </header>
+  <a class="sim-q" data-q="02-data-structure/5" data-mode="Queue"><span><small>관련 질문</small><b>Queue 개념과 구현</b></span></a>
+  <a class="sim-q" data-q="02-data-structure/6" data-mode="Stack"><span><small>관련 질문</small><b>Stack 개념</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p data-mode="Queue">숫자(0~99)를 enqueue로 넣고, dequeue로 가장 먼저 넣은 값을 빼요. 칸은 6개예요.</p>
+    <p data-mode="Stack">숫자(0~99)를 push로 쌓고, pop으로 가장 나중에 넣은 값을 빼요. 칸은 6개예요.</p>
+    <div class="sim-row">
+      <input name="v" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" placeholder="예: 7" aria-label="넣을 값(숫자)">
+      <button class="sim-btn" data-mode="Queue">enqueue</button>
+      <button type="button" class="sim-btn" data-mode="Queue" data-out>dequeue</button>
+      <button class="sim-btn" data-mode="Stack">push</button>
+      <button type="button" class="sim-btn" data-mode="Stack" data-out>pop</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+const N = 6; // 칸 수
+// 예시 값은 직접 고른 숫자. null은 빈 칸
+const _ = null;
+
+// Queue 단계: cells = 칸 6개, f = front 칸 번호, 값 개수 = 든 칸 수
+// 선택값: op 조작 이름, out/outAt 방금 뺀 값과 칸, hl 강조 칸, pop 새로 들어옴, waste 못 쓰는 빈 칸, tag 빨간 꼬리표, bad 빨간 칸, calc 계산식
+const Q = (caption, cells, f, o = {}) => ({ kind: 'q', caption, cells, f, cnt: cells.filter(v => v !== _).length, ...o });
+// Stack 단계: items = 아래에서 위로 쌓인 값
+const S = (caption, items, o = {}) => ({ kind: 's', caption, items, ...o });
+
+const QUEUE = [
+  Q('빈 큐예요. 칸 6개짜리 배열에 front와 rear 표시를 달아 둘 거예요.', [_, _, _, _, _, _], 0),
+  Q('enqueue로 값을 넣으면 맨 뒤(rear)에 붙어요. 첫 값이라 front도 같은 칸이에요.', [8, _, _, _, _, _], 0, { op: 'enqueue(8)', hl: [0], pop: true }),
+  Q('한 번 더 넣으면 앞 값 바로 뒤 칸에 쌓여요. rear만 한 칸 움직여요.', [8, 3, _, _, _, _], 0, { op: 'enqueue(3)', hl: [1], pop: true }),
+  Q('세 번째 값도 같은 방식이에요. 나가는 순서는 들어온 순서 그대로예요.', [8, 3, 6, _, _, _], 0, { op: 'enqueue(6)', hl: [2], pop: true }),
+  Q('dequeue는 front 값을 꺼내요. 먼저 들어온 값이 먼저 나오는 FIFO예요.', [_, 3, 6, _, _, _], 1, { op: 'dequeue() → 8', out: 8, outAt: 0 }),
+  Q('한 번 더 빼면 다음 값이 front가 돼요. 앞 칸은 점점 비어 가요.', [_, _, 6, _, _, _], 2, { op: 'dequeue() → 3', out: 3, outAt: 1 }),
+  Q('값을 더 넣었더니 rear가 맨 끝 칸에 닿았어요. 앞 두 칸은 아직 비어 있어요.', [_, _, 6, 1, 9, 4], 2, { op: 'enqueue 세 번', hl: [3, 4, 5], pop: true, waste: [0, 1] }),
+  Q('또 넣으려는데 rear 뒤에 칸이 없어요. 앞 칸이 비어도 쓸 수 없는 낭비예요.', [_, _, 6, 1, 9, 4], 2, { op: 'enqueue(5)', tag: '뒤에 칸 없음', bad: [5], waste: [0, 1] }),
+  Q('원형 큐는 끝 다음을 맨 앞 칸으로 돌려요. 비어 있던 칸을 다시 써요.', [5, _, 6, 1, 9, 4], 2, { op: 'enqueue(5)', hl: [0], pop: true, calc: 'rear 다음 칸: (5 + 1) % 6 = 0' }),
+  Q('enqueue와 dequeue는 값을 옮기지 않고 front, rear 번호만 바꿔서 둘 다 O(1)이에요.', [5, _, 6, 1, 9, 4], 2),
+];
+
+const STACK = [
+  S('빈 스택이에요. 한쪽 끝인 top에서만 넣고 뺄 수 있어요.', []),
+  S('push로 값을 넣으면 맨 위(top)에 올라가요. 첫 값은 바닥에 놓여요.', [7], { op: 'push(7)', hl: [0], pop: true }),
+  S('한 번 더 push하면 앞의 값 위에 쌓여요. top이 새 값으로 바뀌어요.', [7, 2], { op: 'push(2)', hl: [1], pop: true }),
+  S('또 push해요. 아래 값은 위 값에 가려서 지금은 꺼낼 수 없어요.', [7, 2, 5], { op: 'push(5)', hl: [2], pop: true }),
+  S('하나 더 쌓았어요. 지금 top은 가장 나중에 넣은 값이에요.', [7, 2, 5, 9], { op: 'push(9)', hl: [3], pop: true }),
+  S('pop은 top 값을 꺼내요. 가장 나중에 넣은 값이 먼저 나오는 LIFO예요.', [7, 2, 5], { op: 'pop() → 9', out: 9, outAt: 3 }),
+  S('한 번 더 pop하면 그 아래 값이 새 top이 돼요.', [7, 2], { op: 'pop() → 5', out: 5, outAt: 2 }),
+  S('다시 push하면 남은 값 위에 올라가요. 새 값이 또 맨 위예요.', [7, 2, 4], { op: 'push(4)', hl: [2], pop: true }),
+  S('계속 pop하면 위에서부터 나와요. 넣은 순서의 거꾸로라서 Queue와 반대예요.', [7, 2, 4]),
+  S('push와 pop은 top 한 곳만 바꿔서 둘 다 O(1)이에요. 칸을 옮기지 않아요.', [7, 2, 4]),
+];
+
+// 그리기: 조작 줄 + 그림(Queue 칸 줄 또는 Stack 통) + 나가는 순서
+function render(s, stage) {
+  const op = `<div class="op">${s.op ? `<span class="num">${s.op}</span>` : ''}${s.tag ? `<em>${s.tag}</em>` : ''}${s.calc ? `<span class="calc num">${s.calc}</span>` : ''}</div>`;
+  const cls = (i, on) => ['c num', on ? 'on' : '', s.hl?.includes(i) ? 'hl' : '', s.pop && s.hl?.includes(i) ? 'sim-pop' : '',
+    s.bad?.includes(i) ? 'bad' : '', s.outAt === i ? 'gone' : '', s.waste?.includes(i) ? 'waste' : ''].join(' ');
+  let body, order;
+  if (s.kind === 'q') {
+    const rear = (s.f + s.cnt - 1) % N;
+    order = Array.from({ length: s.cnt }, (_, j) => s.cells[(s.f + j) % N]);
+    body = `<div class="qg">
+      ${s.cells.map((_, i) => `<span class="mk">${s.cnt && i === s.f ? '<span>front</span>' : ''}${s.cnt && i === rear ? '<span>rear</span>' : ''}</span>`).join('')}
+      ${s.cells.map((v, i) => `<span class="${cls(i, v !== _)}">${s.outAt === i ? s.out : s.waste?.includes(i) ? '빔' : v ?? ''}</span>`).join('')}
+      ${s.cells.map((_, i) => `<span class="ix num">${i}</span>`).join('')}
+    </div>`;
+  } else {
+    order = [...s.items].reverse();
+    const rows = Array.from({ length: N }, (_, k) => N - 1 - k); // 위 칸부터
+    const top = s.items.length - 1;
+    body = `<div class="sw"><div class="stk">
+      <div class="tp">${rows.map(i => `<span>${s.items.length && i === top ? 'top' : ''}</span>`).join('')}</div>
+      <div class="sbox">${rows.map(i => `<span class="${cls(i, i < s.items.length)}">${s.outAt === i ? s.out : s.items[i] ?? ''}</span>`).join('')}</div>
+    </div></div>`;
+  }
+  const head = s.kind === 'q' ? '나가는 순서 (앞에서부터)' : '나오는 순서 (위에서부터)';
+  stage.innerHTML = `${op}${body}<div class="ord"><small>${head}</small>${order.length ? order.map(v => `<b class="num">${v}</b>`).join('→') : '<span>비어 있어요</span>'}</div>`;
+}
+
+// 직접 해 보기: 지금 보이는 상태에서 이어지는 단계를 만든다. 입력은 숫자만 받는다
+function tryQueue(s, v, out) {
+  const { cells, f, cnt } = s, rear = (f + cnt - 1) % N;
+  if (out) {
+    if (!cnt) return [Q('빈 큐라서 뺄 값이 없어요. 먼저 enqueue로 넣어 보세요.', cells, f, { op: 'dequeue()', tag: '빈 큐' })];
+    const after = [...cells]; after[f] = _;
+    return [Q('front 값을 꺼냈어요. 가장 먼저 들어온 값이에요.', after, (f + 1) % N, { op: `dequeue() → ${cells[f]}`, out: cells[f], outAt: f })];
+  }
+  if (cnt === N) return [Q('칸 6개가 모두 찼어요. 먼저 dequeue로 빼 보세요.', cells, f, { op: `enqueue(${v})`, tag: '가득 참', bad: [rear] })];
+  const at = (f + cnt) % N, after = [...cells]; after[at] = v;
+  // 단계 하나만 만든다: 연달아 눌러도 항상 마지막 상태에서 이어진다
+  return [Q(`${at}번 칸에 넣었어요. 값이 ${cnt + 1}개가 됐어요.`, after, f, { op: `enqueue(${v})`, hl: [at], pop: true, calc: cnt ? `(${rear} + 1) % 6 = ${at}` : '' })];
+}
+function tryStack(s, v, out) {
+  const { items } = s;
+  if (out) {
+    if (!items.length) return [S('빈 스택이라서 뺄 값이 없어요. 먼저 push로 쌓아 보세요.', items, { op: 'pop()', tag: '빈 스택' })];
+    const t = items.at(-1);
+    return [S('top 값을 꺼냈어요. 가장 나중에 넣은 값이에요.', items.slice(0, -1), { op: `pop() → ${t}`, out: t, outAt: items.length - 1 })];
+  }
+  if (items.length === N) return [S('칸 6개가 모두 찼어요. 먼저 pop으로 빼 보세요.', items, { op: `push(${v})`, tag: '가득 참', bad: [N - 1] })];
+  return [S(`맨 위에 올렸어요. 이제 top은 방금 넣은 값이에요.`, [...items, v], { op: `push(${v})`, hl: [items.length], pop: true })];
+}
+
+const form = document.getElementById('try');
+function run(out) {
+  const raw = form.v.value;
+  if (!out && !/^\d{1,2}$/.test(raw)) return form.v.reportValidity(); // 숫자 1~2자리만
+  const s = Sim.step(), v = Number(raw);
+  Sim.load((s.kind === 'q' ? tryQueue : tryStack)(s, v, out));
+  Sim.play(true);
+  form.reset();
+}
+form.addEventListener('submit', e => { e.preventDefault(); run(false); });
+form.addEventListener('click', e => { if (e.target.closest('[data-out]')) run(true); });
+
+Sim.start({ modes: { Queue: QUEUE, Stack: STACK }, render });
+</script>
+</body>
+</html>

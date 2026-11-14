@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Process 간 통신</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 가로 배치: process 1, 가운데(공유 영역 또는 kernel), process 2, 사이사이 화살표 */
+.flow { display: grid; grid-template-columns: 1fr 20px 1.25fr 20px 1fr; gap: 2px; }
+.pr, .mid { display: grid; align-content: center; justify-items: center; gap: 4px; min-width: 0; min-height: 136px; padding: 10px 4px; border: 1.5px solid var(--grey-200); border-radius: 14px; text-align: center; }
+.pr b, .mid b { font-size: 14px; font-weight: 700; }
+.pr small, .mid small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.pr.hl, .mid.hl { border-color: var(--blue); background: var(--blue-50); }
+.mid.off { border-style: dashed; }
+.mid.bad { border-color: var(--red); background: var(--red-50); }
+.mid.bad small { color: var(--red); }
+.op { min-height: 20px; font-size: 13px; font-weight: 700; color: var(--accent-text); }
+
+/* 공유 칸 값, kernel 버퍼의 메시지 */
+.cell, .msg { padding: 2px 8px; border: 1px solid var(--grey-200); border-radius: 8px; background: var(--bg); font-weight: 700; }
+.cell { min-width: 46px; font-size: 20px; }
+.msg { font-size: 15px; }
+.buf { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+
+/* 데이터가 가는 방향 */
+.arr { align-self: center; text-align: center; font-size: 18px; font-weight: 700; color: var(--grey-200); }
+.arr.on { color: var(--accent-text); }
+
+/* 커널을 거친 횟수 */
+.kc { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.kc b { min-width: 28px; padding: 0 6px; border-radius: 6px; background: var(--grey-100); text-align: center; font-size: 15px; color: var(--ink); }
+.kc.hl b { background: var(--blue-50); color: var(--accent-text); }
+
+/* 직접 해 보기: 고르기 칸 */
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 15px; }
+.sim-row input.v { flex: none; width: 96px; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Process 간 통신</h1>
+  </header>
+  <a class="sim-q" data-q="03-os/5"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 2개">2</span>Process끼리 데이터 주고받기</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try-shm" data-mode="공유 메모리">
+    <h2>직접 해 보기</h2>
+    <p>공유 칸의 시작 값을 정하고, 두 process가 하나씩 더하는 방식을 골라요.</p>
+    <div class="sim-row">
+      <input class="v" name="v" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" required placeholder="예: 5" aria-label="공유 칸 시작 값(숫자)">
+      <select name="how" aria-label="더하는 방식">
+        <option value="one">process 1만 더하기</option>
+        <option value="seq">차례로 둘 다 더하기</option>
+        <option value="both">동시에 둘 다 더하기</option>
+      </select>
+    </div>
+    <div class="sim-row">
+      <button class="sim-btn">해 보기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+
+  <form class="sim-try" id="try-msg" data-mode="메시지 전달">
+    <h2>직접 해 보기</h2>
+    <p>메시지(숫자)를 send 하면 kernel 버퍼에 쌓여요. receive는 먼저 쌓인 것부터 꺼내요.</p>
+    <div class="sim-row">
+      <input name="v" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" required placeholder="예: 58" aria-label="보낼 메시지(숫자)">
+      <button class="sim-btn" name="act" value="send">send</button>
+      <button class="sim-btn" name="act" value="receive" formnovalidate>receive</button>
+    </div>
+    <div class="sim-row">
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 단계 틀: hl = 강조할 곳(p1, p2, mid, k), a1/a2 = 데이터 방향 화살표, p1/p2 = process 옆 한 줄 표시
+const shm = (caption, o = {}) => ({ kind: 'shm', caption, region: true, val: '-', k: 1, a1: '', a2: '', p1: '', p2: '', sub: '', hl: [], ...o });
+const msg = (caption, o = {}) => ({ kind: 'msg', caption, q: [], k: 0, a1: '', a2: '', p1: '', p2: '', hl: [], ...o });
+
+const SHM = [
+  shm('두 process는 주소 공간이 따로라서 서로의 변수를 못 읽어요.', { region: false, k: 0 }),
+  shm('커널에 부탁해서 둘이 같이 쓸 공유 영역을 만들어요.', { a1: '↔', a2: '↔', hl: ['mid', 'k'], sub: '커널이 만들어 줘요', pop: true }),
+  shm('process 1이 공유 칸에 값(8)을 써요. 일반 메모리 쓰기와 같아요.', { val: 8, a1: '→', p1: 'write 8', hl: ['p1', 'mid'], sub: '커널 개입 없음', pop: true }),
+  shm('process 2가 같은 칸을 읽어서 값(8)을 얻어요. 커널은 그대로예요.', { val: 8, a2: '→', p2: 'read 8', hl: ['p2'], sub: '커널 개입 없음' }),
+  shm('설정 뒤에는 커널 없이 주고받아서 빨라요. 동시에 쓰는 건 직접 막아야 해요.', { val: 8, sub: '커널 개입 없음' }),
+];
+
+const MSG = [
+  msg('process 둘은 서로의 메모리를 못 봐요. 메시지는 kernel이 중간에서 옮겨 줘요.'),
+  msg('process 1이 보낼 메시지(31)를 만들었어요.', { p1: '메시지 31', hl: ['p1'] }),
+  msg('send를 부르면 메시지가 kernel 버퍼로 복사돼요.', { q: [31], k: 1, a1: '→', p1: 'send 31', hl: ['mid', 'k'], pop: true }),
+  msg('process 2가 receive를 불러요. kernel이 버퍼에서 꺼내 줘요.', { q: [31], k: 1, a2: '→', p2: 'receive', hl: ['p2', 'mid'] }),
+  msg('메시지(31)가 process 2로 복사됐어요. 부를 때마다 kernel을 거쳐요.', { k: 2, a2: '→', p2: '받음 31', hl: ['p2', 'k'] }),
+  msg('매번 kernel을 거치니 shared memory보다 느려요. 대신 충돌 걱정이 적어요.', { k: 2 }),
+];
+
+// 그리기: process 1, 가운데(공유 영역 또는 kernel), process 2, 커널 거친 횟수
+function render(s, stage) {
+  const on = n => (s.hl.includes(n) ? ' hl' : '');
+  const proc = (n, note) => `<div class="pr${on('p' + n)}"><b>process ${n}</b><small>주소 공간 따로</small><span class="op num">${note}</span></div>`;
+  const arr = a => `<span class="arr${a ? ' on' : ''}" aria-hidden="true">${a || '·'}</span>`;
+  const pop = s.pop ? ' sim-pop' : '';
+  let mid;
+  if (s.kind === 'shm') {
+    mid = s.region
+      ? `<div class="mid${on('mid')}${s.bad ? ' bad' : ''}"><b>공유 영역</b><span class="cell num${pop}">${s.val}</span><small>${s.sub}</small></div>`
+      : '<div class="mid off"><b>공유 영역</b><small>아직 없어요</small></div>';
+  } else {
+    const chips = s.q.map((m, i) => `<span class="msg num${i === s.q.length - 1 ? pop : ''}">${m}</span>`).join('');
+    mid = `<div class="mid${on('mid')}${s.bad ? ' bad' : ''}"><b>kernel</b><small>메시지 버퍼</small><div class="buf">${chips || '<small>비어 있음</small>'}</div></div>`;
+  }
+  stage.innerHTML = `
+    <div class="flow">${proc(1, s.p1)}${arr(s.a1)}${mid}${arr(s.a2)}${proc(2, s.p2)}</div>
+    <p class="kc${on('k')}">커널을 거친 횟수 <b class="num">${s.k}</b></p>`;
+}
+
+// 공유 메모리 직접 해 보기: 시작 값 v에 두 process가 하나씩 더하는 세 가지 방식
+function race(v, how) {
+  const at = (caption, o) => shm(caption, { val: v, ...o });
+  const w = v + 1, e = v + 2;
+  const intro = at(`공유 칸의 현재 값(${v})에 process가 하나를 더하려 해요.`);
+  if (how === 'one') return [intro,
+    at(`process 1이 읽고 하나를 더해 값(${w})을 써요.`, { val: w, a1: '→', p1: `write ${w}`, hl: ['p1', 'mid'], pop: true }),
+    at(`process 2가 읽으면 값(${w})이 보여요. 커널은 안 거쳐요.`, { val: w, a2: '→', p2: `read ${w}`, hl: ['p2'] })];
+  if (how === 'seq') return [intro,
+    at(`process 1이 읽고 더해서 값(${w})을 써요. 끝난 뒤 process 2 차례예요.`, { val: w, a1: '→', p1: `write ${w}`, hl: ['p1', 'mid'], pop: true }),
+    at(`process 2가 값(${w})을 읽고 더해서 값(${e})을 써요.`, { val: e, a2: '←', p2: `write ${e}`, hl: ['p2', 'mid'], pop: true }),
+    at(`차례로 하면 기대한 값(${e})이 나와요. 동시에 하면 달라질 수 있어요.`, { val: e })];
+  return [intro,
+    at(`둘 다 같은 값(${v})을 읽었어요. 아직 아무도 쓰지 않았어요.`, { a1: '←', a2: '→', p1: `read ${v}`, p2: `read ${v}`, hl: ['p1', 'p2'] }),
+    at(`각자 하나를 더해요. 둘 다 계산 결과가 같아요: ${w}.`, { p1: `${v}+1 = ${w}`, p2: `${v}+1 = ${w}`, hl: ['p1', 'p2'] }),
+    at(`각자 결과를 공유 칸에 써요. 둘 다 같은 값(${w})을 써요.`, { val: w, a1: '→', a2: '←', p1: `write ${w}`, p2: `write ${w}`, hl: ['p1', 'p2', 'mid'], pop: true }),
+    at(`결과(${w})는 기대한 값(${e})과 달라요. 동기화 문제로 이어져요.`, { val: w, bad: true, sub: `기대 ${e}` })];
+}
+
+document.getElementById('try-shm').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target;
+  if (!/^\d{1,2}$/.test(f.v.value)) return;
+  Sim.load(race(Number(f.v.value), f.how.value));
+  Sim.play(true);
+  f.v.value = '';
+});
+
+// 메시지 전달 직접 해 보기: kernel 버퍼(먼저 온 것부터 나감)에 send, receive
+const CAP = 4; // 이 화면에서 버퍼에 담는 최대 개수
+document.getElementById('try-msg').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target, s = Sim.step();
+  // 직접 해 본 단계는 끝 상태(end)를 갖고 있어서, 재생 도중에 눌러도 이어서 한다
+  const { q, k, got } = s.end || { q: s.q, k: s.k, got: null };
+  const keep = (caption, o) => msg(caption, { q, k, got, p2: got === null ? '' : `받음 ${got}`, ...o });
+  let steps;
+  if ((e.submitter?.value || 'send') === 'receive') {
+    if (!q.length) steps = [keep('버퍼가 비어서 받을 메시지가 없어요. 먼저 send가 필요해요.', { bad: true, hl: ['mid'] })];
+    else {
+      const m = q[0];
+      steps = [
+        keep(`process 2가 receive를 불러요. 먼저 온 메시지(${m})를 꺼내요.`, { a2: '→', p2: 'receive', hl: ['p2', 'mid'] }),
+        keep(`메시지(${m})가 process 2로 복사됐어요.`, { q: q.slice(1), k: k + 1, got: m, a2: '→', p2: `받음 ${m}`, hl: ['p2', 'k'] }),
+      ];
+    }
+  } else {
+    if (!/^\d{1,2}$/.test(f.v.value)) return;
+    const m = Number(f.v.value);
+    if (q.length >= CAP) steps = [keep(`버퍼가 가득 찼어요(${CAP}개까지). 먼저 receive 해 주세요.`, { bad: true, hl: ['mid'] })];
+    else steps = [
+      keep(`process 1이 메시지(${m})를 send 해요.`, { a1: '→', p1: `send ${m}`, hl: ['p1'] }),
+      keep(`메시지(${m})가 kernel 버퍼 끝에 복사됐어요.`, { q: [...q, m], k: k + 1, a1: '→', p1: `send ${m}`, hl: ['mid', 'k'], pop: true }),
+    ];
+    f.v.value = '';
+  }
+  // 이 줄의 모든 단계에 마지막 단계의 상태를 end로 달아 둔다
+  const { q: eq, k: ek, got: eg } = steps.at(-1);
+  steps.forEach(st => { st.end = { q: eq, k: ek, got: eg }; });
+  Sim.load(steps);
+  Sim.play(true);
+});
+
+Sim.start({ modes: { '공유 메모리': SHM, '메시지 전달': MSG }, render });
+</script>
+</body>
+</html>

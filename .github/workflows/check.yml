@@ -1,0 +1,21 @@
+# PR과 main 푸시마다: 앱 빌드, 시뮬레이션 화면 점검(넘침·콘솔 오류·em dash)
+name: check
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # 앱 빌드(배포와 같은 명령)
+      - run: python3 scripts/build.py
+      # 시뮬레이션 점검에 필요한 브라우저
+      - run: pip install playwright && python -m playwright install --with-deps chromium
+      - run: python3 sims/_kit/check.py
+      # 배포물에 em dash 금지
+      - run: "! grep -rlI -e '—' -e '–' app notes sims illustrations/a"

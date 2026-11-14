@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Process 메모리와 thread</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 그림 머리줄: 왼쪽 이름, 오른쪽 보충 */
+.hd { display: flex; justify-content: space-between; align-items: center; margin: 8px 2px 4px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.hd:first-child { margin-top: 0; }
+
+/* main.c 코드판: 줄마다 번호 */
+.src { padding: 6px; border-radius: 12px; background: var(--grey-100); }
+.ln { display: flex; gap: 8px; padding: 0 4px; border-radius: 6px; font: 12px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.ln i { width: 14px; font-style: normal; text-align: right; color: var(--ink-2); }
+.ln code { font: inherit; white-space: pre; }
+.ln.on { background: var(--blue-50); color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--blue); }
+
+/* 메모리 칸 묶음: 영역 하나가 한 줄 */
+.mem { display: grid; gap: 4px; align-content: start; min-height: 232px; }
+.mem.off { place-items: center; align-content: center; border: 1.5px dashed var(--grey-200); border-radius: 12px; font-size: 14px; color: var(--ink-2); }
+.rg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 34px; padding: 6px 10px; border: 1px solid var(--grey-200); border-radius: 10px; background: var(--bg); }
+.rg > b { min-width: 40px; font-size: 14px; }
+.rg small { font-size: 12px; color: var(--ink-2); }
+.rg.hl { border-color: var(--blue); background: var(--blue-50); }
+.rg.big { min-height: 56px; }
+.cp { padding: 2px 7px; border-radius: 6px; background: var(--grey-100); font-size: 12px; font-weight: 700; }
+.hl .cp { background: var(--bg); }
+.cp.on { background: var(--accent-text); color: var(--bg); }
+.tm { margin-left: auto; padding: 2px 8px; border: 1px solid var(--blue); border-radius: 999px; background: var(--bg); font-size: 12px; font-style: normal; font-weight: 700; color: var(--accent-text); }
+.gp { display: flex; justify-content: space-between; align-items: center; min-height: 26px; padding: 0 10px; font-size: 12px; font-weight: 700; color: var(--accent-text); }
+.gp small { font-weight: 500; color: var(--ink-2); }
+.gp .off { visibility: hidden; }
+
+/* thread 보기: 높이를 고정해 stack이 늘수록 빈 공간이 줄어든다 */
+.mem.fx { display: flex; flex-direction: column; height: 268px; min-height: 0; }
+.mem.fx .gp { flex: 1; align-items: center; justify-content: center; }
+.mem.fx .rg { min-height: 30px; padding-top: 3px; padding-bottom: 3px; }
+.mem.fx .rg.big { min-height: 44px; }
+.mem.fx .rg > b { min-width: 0; }
+
+/* 할당 시점: 행 이름 + compile 칸 + runtime 칸 */
+.tl { display: grid; grid-template-columns: 56px 1fr 1fr; gap: 6px; align-items: stretch; }
+.ph { text-align: center; font-size: 14px; }
+.axis { grid-column: 2 / 4; position: relative; height: 2px; margin: 0 6px 6px; background: var(--blue); }
+.axis::after { content: ""; position: absolute; right: -4px; top: -4px; border: 5px solid transparent; border-right: 0; border-left: 8px solid var(--blue); }
+.rw { align-self: center; font-size: 14px; line-height: 1.3; }
+.cell { display: grid; gap: 6px; place-items: center; align-content: center; min-height: 96px; padding: 8px 4px; border: 1px solid var(--grey-200); border-radius: 12px; text-align: center; }
+.cell.hl { border-color: var(--blue); background: var(--blue-50); }
+.cell code { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.cell .no { font-size: 12px; color: var(--ink-2); }
+.cell .tm { margin: 0; }
+.bxs { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+.chain { display: flex; justify-content: center; gap: 4px; padding: 4px 0; }
+.bx { width: 22px; height: 22px; border: 1px solid var(--grey-700); border-radius: 4px; background: var(--bg); }
+.hl .bx { border-color: var(--accent-text); }
+/* 연결 리스트 노드: 값 칸 + 다음 칸, 일부러 높이를 어긋나게 해 흩어진 느낌을 준다 */
+.nd { display: inline-flex; border: 1px solid var(--grey-700); border-radius: 4px; background: var(--bg); }
+.nd i { display: grid; place-items: center; width: 14px; height: 22px; font-size: 11px; font-style: normal; font-weight: 700; }
+.nd i + i { border-left: 1px solid var(--grey-700); color: var(--accent-text); }
+.nd:nth-child(2) { transform: translateY(4px); }
+.nd:nth-child(3) { transform: translateY(-3px); }
+
+/* 직접 해 보기 버튼 줄 */
+.lb { margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.pick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pick button { height: 44px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--grey-100); font-size: 15px; font-weight: 700; color: var(--grey-800); }
+.pick button[aria-pressed="true"] { background: var(--blue-50); color: var(--accent-text); box-shadow: inset 0 0 0 1.5px var(--blue); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Process 메모리와 thread</h1>
+  </header>
+  <a class="sim-q" data-q="03-os/1" data-mode="메모리 영역"><span><small>관련 질문</small><b>process와 메모리 영역</b></span></a>
+  <a class="sim-q" data-q="03-os/3" data-mode="thread 공유"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 2개">2</span>thread끼리 나누는 것</b></span></a>
+  <a class="sim-q" data-q="02-data-structure/4" data-mode="할당 시점"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>배열과 연결 리스트의 할당 때</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <div data-mode="메모리 영역">
+      <p>코드 줄이나 메모리 영역을 눌러 보세요. 줄은 들어가는 영역을, 영역은 설명을 보여 줘요.</p>
+      <div class="lb">코드 줄 고르기</div>
+      <div class="pick">
+        <button data-line="1" aria-pressed="false">1줄</button><button data-line="2" aria-pressed="false">2줄</button><button data-line="3" aria-pressed="false">3줄</button><button data-line="4" aria-pressed="false">4줄</button><button data-line="5" aria-pressed="false">5줄</button>
+      </div>
+      <div class="lb">영역 고르기</div>
+      <div class="pick">
+        <button data-rg="code" aria-pressed="false">code</button><button data-rg="data" aria-pressed="false">data</button><button data-rg="heap" aria-pressed="false">heap</button><button data-rg="stack" aria-pressed="false">stack</button>
+      </div>
+    </div>
+    <div data-mode="thread 공유">
+      <p>thread 수를 골라 보세요. 영역마다 무엇이 늘고 무엇이 그대로인지 볼 수 있어요.</p>
+      <div class="pick">
+        <button data-n="1" aria-pressed="false">1개</button><button data-n="2" aria-pressed="false">2개</button><button data-n="3" aria-pressed="false">3개</button>
+      </div>
+    </div>
+    <div data-mode="할당 시점">
+      <p>이 탭은 단계로만 봐요. 앞의 두 탭에서 직접 눌러 볼 수 있어요.</p>
+    </div>
+    <div class="pick"><button type="button" id="rs" style="font-weight:600">처음부터</button></div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// ---------- 1. 메모리 영역 ----------
+// 예시 코드: 줄마다 어느 영역에 무엇이 놓이는지 LINE에 적어 둔다
+const CODE = ['int limit = 8;', 'int pack(int cnt) {', '  int step = 2;', '  int *buf = malloc(cnt * 4);', '  free(buf);', '  return step;', '}', 'int main() { return pack(limit); }'];
+// 변수 칩: r = 들어가는 영역, t = 칩에 적을 글자
+const VARS = { limit: { r: 'data', t: 'limit' }, cnt: { r: 'stack', t: 'cnt' }, step: { r: 'stack', t: 'step' }, buf: { r: 'stack', t: 'buf' }, blk: { r: 'heap', t: 'malloc 공간' } };
+const LINE = {
+  1: { add: ['limit'], del: [], hl: ['data'], cap: '전역 변수는 프로그램이 끝날 때까지 남아서 data 영역에 놓여요.' },
+  2: { add: ['cnt'], del: [], hl: ['stack'], cap: '매개변수는 함수를 부를 때 stack에 쌓여요.' },
+  3: { add: ['step'], del: [], hl: ['stack'], cap: '함수 안에서 만든 지역 변수도 stack에 쌓여요.' },
+  4: { add: ['blk', 'buf'], del: [], hl: ['heap', 'stack'], cap: 'malloc으로 받은 공간은 heap, 그 주소를 든 포인터 변수는 stack이에요.' },
+  5: { add: [], del: ['blk'], hl: ['heap'], cap: 'free로 돌려주면 heap 공간이 비워져요. 이건 직접 해야 해요.' },
+};
+const RG = {
+  code: { hl: ['code'], cap: 'code 영역은 실행할 명령어가 놓이는 곳이에요.' },
+  data: { hl: ['data'], cap: 'data 영역은 전역 변수와 static 변수가 놓이는 곳이에요.' },
+  heap: { hl: ['heap'], time: ['heap'], cap: 'heap은 실행 중에 요청해서 받는 공간이에요. 크기는 runtime에 정해져요.' },
+  stack: { hl: ['stack'], time: ['stack'], cap: 'stack은 함수를 부를 때 쌓이는 공간이에요. 크기는 compile time에 정해져요.' },
+};
+const HINT = { code: '명령어', data: '전역, static 변수', heap: '동적 할당', stack: '지역, 매개 변수' };
+const TIME = { heap: 'runtime', stack: 'compile time' };
+
+// 메모리 단계 틀: 값이 안 주어진 것은 비워 둔다
+const mem = (caption, o = {}) => ({ kind: 'mem', caption, proc: true, placed: [], hl: [], line: 0, arrows: false, time: [], fresh: [], ...o });
+// 코드 줄 n번을 누른 결과: 앞 단계의 변수 칩을 이어받아 더하고 뺀다
+const byLine = (prev, n) => {
+  const L = LINE[n];
+  return mem(L.cap, { line: n, hl: L.hl, fresh: L.add, placed: [...prev.placed.filter(v => !L.del.includes(v) && !L.add.includes(v)), ...L.add] });
+};
+// 영역 r을 누른 결과: 설명, (heap, stack이면) 크기 정해지는 때와 자라는 방향
+const byRegion = (prev, r) => mem(RG[r].cap, { placed: prev.placed, hl: RG[r].hl, time: RG[r].time || [], arrows: !!RG[r].time });
+
+const m1 = mem('program은 디스크에 있는 파일일 뿐이에요. 아직 실행되는 게 아니에요.', { proc: false });
+const m2 = mem('실행하면 운영체제가 파일을 메모리에 올려요. process가 되고 영역 4개가 생겨요.');
+const m3 = byLine(m2, 1), m4 = byLine(m3, 2), m5 = byLine(m4, 3), m6 = byLine(m5, 4);
+const m7 = { ...m6, line: 0, fresh: [], arrows: true, hl: ['heap', 'stack'], caption: 'heap은 아래로, stack은 위로 자라요. 가운데 빈 공간을 나눠 써요.' };
+const m8 = { ...m7, time: ['stack', 'heap'], caption: 'stack 크기는 compile time에, heap 크기는 runtime에 정해져요.' };
+const MEMORY = [m1, m2, m3, m4, m5, m6, m7, m8];
+
+// 영역 한 줄: 이름, 힌트, 변수 칩, (있으면) 크기 정해지는 때
+const chips = (s, r) => s.placed.filter(v => VARS[v].r === r).map(v => `<span class="cp${s.fresh.includes(v) ? ' sim-pop' : ''}">${VARS[v].t}</span>`).join('');
+function renderMem(s, stage) {
+  const row = r => `<div class="rg${r === 'heap' || r === 'stack' ? ' big' : ''}${s.hl.includes(r) ? ' hl' : ''}"><b>${r}</b><small>${HINT[r]}</small>${chips(s, r)}${s.time.includes(r) ? `<em class="tm">크기: ${TIME[r]}</em>` : ''}</div>`;
+  const arrow = (t, on) => `<span class="${on ? '' : 'off'}">${t}</span>`;
+  stage.innerHTML = `
+    <div class="hd"><span>디스크 main.c</span></div>
+    <div class="src">${CODE.map((t, i) => `<div class="ln${s.line === i + 1 ? ' on' : ''}"><i class="num">${i + 1}</i><code>${t}</code></div>`).join('')}</div>
+    <div class="hd"><span>메모리(RAM)${s.proc ? ' · process' : ''}</span><span>위가 낮은 주소</span></div>
+    ${s.proc
+      ? `<div class="mem">${row('code')}${row('data')}${row('heap')}<div class="gp">${arrow('heap ↓', s.arrows)}<small>빈 공간</small>${arrow('↑ stack', s.arrows)}</div>${row('stack')}</div>`
+      : '<div class="mem off">아직 비어 있어요</div>'}`;
+}
+
+// ---------- 2. thread 공유 ----------
+// n = thread 수, focus = shared(같이 쓰는 영역 강조) | own(thread마다 늘어난 것 강조), fresh = 방금 생긴 thread 번호
+const thr = (caption, n, focus = null, fresh = 0) => ({ kind: 'thr', caption, n, focus, fresh });
+const THREAD = [
+  thr('thread가 하나예요. PC는 다음 명령어를, SP는 stack의 꼭대기를 가리켜요.', 1),
+  thr('thread마다 호출 기록이 달라서 stack, PC, SP가 하나씩 늘어요.', 2, 'own', 2),
+  thr('하나 더 만들어도 같아요. 늘어나는 건 stack, PC, SP뿐이에요.', 3, 'own', 3),
+  thr('code, data, heap은 늘지 않고 thread 모두가 같이 써요.', 3, 'shared'),
+];
+// 직접 해 보기: thread n개일 때의 단계
+const threadSteps = n => n === 1
+  ? [thr('thread가 1개일 때예요. 영역 4개를 혼자 쓰고 PC, SP도 하나씩이에요.', 1)]
+  : [thr(`thread를 ${n}개로 늘리면 stack, PC, SP가 ${n}벌이 돼요.`, n, 'own', n),
+     thr('code, data, heap은 그대로 한 벌이에요. thread끼리 같이 써요.', n, 'shared')];
+
+function renderThr(s, stage) {
+  const sh = s.focus === 'shared', own = s.focus === 'own';
+  const pill = sh ? '<em class="tm">공유</em>' : '';
+  const pcs = Array.from({ length: s.n }, (_, k) => `<span class="cp${own ? ' on' : ''}">PC ${k + 1}</span>`).join('');
+  // 위에서부터 thread n의 stack, 맨 아래가 thread 1 (stack은 아래에서 위로 자란다)
+  const stacks = Array.from({ length: s.n }, (_, k) => s.n - k).map(t =>
+    `<div class="rg${own ? ' hl' : ''}"><b>thread ${t} stack</b><span class="cp${own ? ' on' : ''}${t === s.fresh ? ' sim-pop' : ''}">SP ${t}</span></div>`).join('');
+  stage.innerHTML = `
+    <div class="hd"><span>메모리(RAM) · process 하나</span><span>위가 낮은 주소</span></div>
+    <div class="mem fx">
+      <div class="rg${sh ? ' hl' : ''}"><b>code</b>${pcs}${pill}</div>
+      <div class="rg${sh ? ' hl' : ''}"><b>data</b><small>${HINT.data}</small>${pill}</div>
+      <div class="rg big${sh ? ' hl' : ''}"><b>heap</b><small>${HINT.heap}</small>${pill}</div>
+      <div class="gp"><small>빈 공간</small></div>
+      ${stacks}
+    </div>`;
+}
+
+// ---------- 3. 할당 시점 ----------
+// arr = 배열 칸 보임, lc = 연결 리스트 compile 칸 안내, nodes = 노드 수, fixed = 배열 크기 고정 안내, hl = 강조할 칸(a/l + c/r)
+const alloc = (caption, o) => ({ kind: 'alloc', caption, arr: false, lc: false, nodes: 0, fixed: false, hl: [], ...o });
+const ALLOC = [
+  alloc('프로그램에는 compile time과 runtime이 있어요. 메모리를 받는 때가 둘로 갈려요.'),
+  alloc('배열은 크기를 코드에 적어요. 그래서 compile time에 크기가 정해지고 stack에 잡혀요.', { arr: true, hl: ['ac'] }),
+  alloc('연결 리스트는 compile time에 노드가 하나도 없어요. 몇 개가 필요할지 아직 몰라요.', { arr: true, lc: true, hl: ['lc'] }),
+  alloc('실행되면 노드가 필요할 때마다 malloc으로 heap에서 하나씩 받아요.', { arr: true, lc: true, nodes: 1, hl: ['lr'] }),
+  alloc('노드는 필요한 만큼 늘고 곳곳에 흩어져요. 배열은 4칸으로 고정이에요.', { arr: true, lc: true, nodes: 3, fixed: true, hl: ['lr', 'ar'] }),
+];
+
+function renderAlloc(s, stage) {
+  const c = k => s.hl.includes(k) ? ' hl' : '';
+  const no = t => `<small class="no">${t}</small>`;
+  const nodes = Array.from({ length: s.nodes }, (_, i) =>
+    `<span class="nd${i === s.nodes - 1 && s.nodes < 3 ? ' sim-pop' : ''}"><i></i><i>${i === s.nodes - 1 ? '/' : '→'}</i></span>`).join('');
+  stage.innerHTML = `
+    <div class="tl">
+      <span></span><b class="ph">compile time</b><b class="ph">runtime</b>
+      <div class="axis"></div>
+      <b class="rw">배열</b>
+      <div class="cell${c('ac')}">${s.arr ? `<code>int row[4];</code><span class="bxs">${'<span class="bx"></span>'.repeat(4)}</span><em class="tm">stack</em>` : no('-')}</div>
+      <div class="cell${c('ar')}">${s.fixed ? no('크기 고정') : no('-')}</div>
+      <b class="rw">연결 리스트</b>
+      <div class="cell${c('lc')}">${s.lc ? no('노드 없음') : no('-')}</div>
+      <div class="cell${c('lr')}">${s.nodes ? `<span class="chain">${nodes}</span><em class="tm">heap</em>` : no('-')}</div>
+    </div>`;
+}
+
+const render = (s, stage) => ({ mem: renderMem, thr: renderThr, alloc: renderAlloc })[s.kind](s, stage);
+
+// ---------- 직접 해 보기 ----------
+const form = document.getElementById('try');
+// 누른 버튼만 눌림 표시
+const press = b => {
+  form.querySelectorAll('[aria-pressed]').forEach(x => x.setAttribute('aria-pressed', 'false'));
+  if (b) b.setAttribute('aria-pressed', 'true');
+};
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const d = e.submitter && e.submitter.dataset, cur = Sim.step();
+  if (!d) return;
+  if (d.line in LINE && cur.kind === 'mem') Sim.load([byLine(cur, +d.line)]);
+  else if (d.rg in RG && cur.kind === 'mem') Sim.load([byRegion(cur, d.rg)]);
+  else if (['1', '2', '3'].includes(d.n) && cur.kind === 'thr') { const st = threadSteps(+d.n); Sim.load(st); Sim.play(st.length > 1); }
+  else return;
+  press(e.submitter);
+});
+document.getElementById('rs').addEventListener('click', () => { Sim.reset(); press(); });
+
+Sim.start({ modes: { '메모리 영역': MEMORY, 'thread 공유': THREAD, '할당 시점': ALLOC }, render });
+document.querySelector('.sim-tabs').addEventListener('click', () => press());
+</script>
+</body>
+</html>

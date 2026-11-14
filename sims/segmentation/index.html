@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segmentation 주소 변환</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 왼쪽(논리 주소, segment table, 결과) + 오른쪽(물리 메모리) */
+.sg { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; }
+.lc { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.lab { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+
+/* 논리 주소: (세그먼트 번호, 오프셋) 두 칸 */
+.la { display: grid; grid-template-columns: 1fr 1.3fr; gap: 4px; }
+.la > span { display: grid; gap: 1px; min-width: 0; padding: 6px 8px; border: 1.5px solid var(--grey-200); border-radius: 10px; }
+.la small { font-size: 11px; font-weight: 600; color: var(--ink-2); }
+.la b { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.la .hl { border-color: var(--blue); background: var(--blue-50); }
+.la .bad { border-color: var(--red); background: var(--red-50); }
+
+/* segment table: 한 줄 = 한 segment */
+.st { display: grid; gap: 2px; }
+.sr { display: grid; grid-template-columns: 0.6fr 1fr 1fr; align-items: center; height: 28px; border-radius: 8px; font-size: 14px; text-align: center; }
+.sr.h { height: 22px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.sr:not(.h) { background: var(--grey-100); }
+.sr.hl { background: var(--blue-50); box-shadow: inset 0 0 0 1px var(--blue); font-weight: 700; }
+.sr.bad { background: var(--red-50); box-shadow: inset 0 0 0 1px var(--red); font-weight: 700; }
+.sr .on { margin: 2px; padding: 1px 0; border-radius: 6px; background: var(--bg); box-shadow: 0 0 0 1.5px var(--accent-text); color: var(--accent-text); }
+.sr.bad .on { box-shadow: 0 0 0 1.5px var(--red); color: var(--red); }
+
+/* 결과 상자: 비교 한 줄, 계산 한 줄 */
+.rs { display: grid; gap: 6px; padding: 8px 10px; border: 1.5px dashed var(--grey-200); border-radius: 14px; font-size: 14px; }
+.rs > div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 24px; font-weight: 700; color: var(--mute); }
+.rs .go { color: var(--accent-text); }
+.rs .no { color: var(--red); }
+.tag { padding: 1px 8px; border-radius: 6px; font-size: 12px; }
+.go .tag { background: var(--blue-50); }
+.no .tag { background: var(--red-50); }
+
+/* 물리 메모리: 0부터 10000까지 세로 막대, 위가 낮은 주소 */
+.rc { min-width: 0; }
+.mem { position: relative; height: 320px; margin: 8px 0; }
+.bar { position: absolute; left: 44px; width: 36px; top: 0; bottom: 0; border-radius: 6px; background: var(--grey-100); }
+.sb { position: absolute; left: 0; right: 0; display: grid; place-items: center; overflow: hidden; border-radius: 3px; background: var(--blue-50); box-shadow: inset 0 0 0 1px var(--blue); font-size: 11px; font-weight: 700; line-height: 1; color: var(--ink-2); }
+.sb.on { background: var(--blue); color: var(--grey-900); }
+.sb.bad { background: var(--red-50); box-shadow: inset 0 0 0 1.5px var(--red); color: var(--red); }
+.ad { position: absolute; left: 0; width: 40px; transform: translateY(-50%); text-align: right; font-size: 11px; line-height: 1; color: var(--ink-2); }
+.ad.on { font-weight: 700; color: var(--accent-text); }
+.ad.end { color: var(--mute); }
+.mk { position: absolute; left: 40px; width: 44px; border-top: 2px solid var(--cta); }
+.mk b { position: absolute; left: 48px; top: 0; transform: translateY(-50%); font-size: 11px; line-height: 1; color: var(--cta); }
+
+/* 직접 해 보기: 선택 + 숫자 입력, 아래 줄에 버튼 */
+.sim-try select { flex: none; width: 112px; height: 48px; padding: 0 8px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-try select:focus { border-color: var(--accent-text); outline: none; }
+.sim-try .sim-row .sim-btn { flex: 1; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Segmentation 주소 변환</h1>
+  </header>
+  <a class="sim-q" data-q="03-os/9"><span><small>관련 질문</small><b>Segment 단위 주소 변환</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try" novalidate>
+    <h2>직접 해 보기</h2>
+    <p>세그먼트 번호와 오프셋을 넣어 보세요. 오프셋이 limit 미만이면 변환되고, 이상이면 오류예요. 경계 값도 해 보세요.</p>
+    <div class="sim-row">
+      <select name="seg" aria-label="세그먼트 번호">
+        <option value="0">세그먼트 0</option>
+        <option value="1">세그먼트 1</option>
+        <option value="2">세그먼트 2</option>
+        <option value="3" selected>세그먼트 3</option>
+      </select>
+      <input name="off" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="오프셋 (예: 120)" aria-label="오프셋(0 이상의 정수)">
+    </div>
+    <div class="sim-row">
+      <button class="sim-btn">변환하기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 segment table: [base, limit]. 물리 메모리는 0부터 10000까지
+const SEG = [[2000, 500], [6500, 800], [3200, 1200], [8600, 600]];
+
+// 단계 하나: phase 0 주소 받기, 1 행 찾기, 2 비교, 3 변환 성공, 4 오류(trap), -1 잘못된 입력
+const mk = (s, d, phase, caption) => ({ caption, s, d, phase });
+
+// (s, d) 하나를 처음부터 끝까지 푸는 단계들
+function build(s, d) {
+  const [base, lim] = SEG[s], pass = d < lim;
+  return [
+    mk(s, d, 0, '논리 주소는 세그먼트 번호와 오프셋 한 쌍이에요. 이걸 물리 주소로 바꿔 볼게요.'),
+    mk(s, d, 1, `table의 ${s}번 행을 찾았어요. base ${base}, limit ${lim} 값이 있어요.`),
+    mk(s, d, 2, `오프셋이 limit보다 작아야 해요. 비교하면 ${d}\u00a0${pass ? '<' : '>='}\u00a0${lim}, ${pass ? '통과예요.' : '범위 밖이에요.'}`),
+    pass ? mk(s, d, 3, `통과했으니 base에 오프셋을 더해요. ${base}\u00a0+\u00a0${d}\u00a0=\u00a0${base + d}, 물리 주소예요.`)
+         : mk(s, d, 4, 'limit 이상이라 변환하지 않아요. trap이 걸려 보통 process는 종료돼요.'),
+  ];
+}
+
+// 기본 예시: (3, 450) 변환 성공 + 오프셋이 limit 이상인 경우 하나
+const STEPS = [...build(3, 450), mk(3, 700, 4, '이번엔 오프셋을 크게 줘 봤어요. 비교 결과 700\u00a0>=\u00a0600, trap이 걸려요.')];
+
+// 그리기: 논리 주소, segment table, 결과 상자, 물리 메모리
+function render({ s, d, phase }, stage) {
+  const sel = phase >= 1, [base, lim] = SEG[s], pass = phase >= 2 && d < lim;
+  const cell = (small, v, cls) => `<span class="${cls}"><small>${small}</small><b class="num">${v}</b></span>`;
+  const addr = phase < 0 ? ['', 'bad'] : phase === 0 ? ['hl', 'hl'] : phase === 1 ? ['hl', ''] : ['', phase === 2 ? 'hl' : ''];
+  const row = (i, [b, l]) => {
+    const on = i === s && sel, kind = !on ? '' : phase === 4 ? ' bad' : ' hl';
+    return `<div class="sr num${kind}"><span>${i}</span><span${on && phase === 3 ? ' class="on"' : ''}>${b}</span><span${on && (phase === 2 || phase === 4) ? ' class="on"' : ''}>${l}</span></div>`;
+  };
+  const check = phase < 1 ? '오프셋 < limit ?' : phase === 1 ? `${d} < ${lim} ?` : `${d} ${pass ? '<' : '>='} ${lim}<span class="tag">${pass ? '통과' : '범위 밖'}</span>`;
+  const calc = phase === 3 ? `${base} + ${d} = ${base + d}` : phase === 4 ? '주소 오류 (trap)' : 'base + 오프셋 = ?';
+  const mem = SEG.map(([b], i) => `<span class="ad num${i === s && sel ? ' on' : ''}" style="top:${b / 100}%">${b}</span>`).join('');
+  const blocks = SEG.map(([b, l], i) => `<div class="sb${i === s && sel ? (phase === 4 ? ' bad' : ' on') : ''}" style="top:${b / 100}%;height:${l / 100}%">S${i}</div>`).join('');
+  stage.innerHTML = `
+    <div class="sg">
+      <div class="lc">
+        <div><span class="lab">논리 주소</span>
+          <div class="la">${cell('세그먼트', s, addr[0])}${cell('오프셋', phase < 0 ? '?' : d, addr[1])}</div></div>
+        <div><span class="lab">segment table</span>
+          <div class="st"><div class="sr h"><span>#</span><span>base</span><span>limit</span></div>${SEG.map((r, i) => row(i, r)).join('')}</div></div>
+        <div class="rs num"><div class="${phase >= 2 ? (pass ? 'go' : 'no') : ''}">${check}</div><div class="${phase === 3 ? 'go' : phase === 4 ? 'no' : ''}">${calc}</div></div>
+      </div>
+      <div class="rc"><span class="lab">물리 메모리</span>
+        <div class="mem"><div class="bar">${blocks}</div>${mem}
+          <span class="ad end num" style="top:0">0</span><span class="ad end num" style="top:100%">10000</span>
+          ${phase === 3 ? `<div class="mk num" style="top:${(base + d) / 100}%"><b>${base + d}</b></div>` : ''}</div></div>
+    </div>`;
+}
+
+// 직접 해 보기: 입력을 검사하고, 맞으면 변환 단계, 틀리면 안내 한 단계를 보여 준다
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const s = Number(e.target.seg.value), raw = e.target.off.value.trim();
+  const msg = raw === '' ? '오프셋을 입력해 주세요. 0 이상의 정수를 넣을 수 있어요.'
+    : raw[0] === '-' ? '오프셋은 음수가 될 수 없어요. 0 이상의 정수를 넣어 주세요.'
+    : !/^\d+$/.test(raw) ? '정수만 넣을 수 있어요. 소수나 글자는 안 돼요.'
+    : Number(raw) > 999999 ? '너무 큰 값이에요. 6자리 이하 정수를 넣어 주세요.' : '';
+  Sim.load(msg ? [mk(s, 0, -1, msg)] : build(s, Number(raw)));
+  if (!msg) Sim.play(true);
+  e.target.off.value = '';
+});
+
+Sim.start({ steps: STEPS, render });
+</script>
+</body>
+</html>

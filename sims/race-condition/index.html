@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>경쟁 상태</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 메모리: 공유 변수 한 칸. load, store 때 파란 테두리 */
+.mem { display: grid; gap: 2px; padding: 10px 14px; border: 1.5px dashed var(--grey-200); border-radius: 14px; text-align: center; }
+.mem.hl { border-style: solid; border-color: var(--blue); background: var(--blue-50); }
+.mem small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.mem b { font-size: 22px; font-weight: 700; }
+.mem span { font-size: 14px; font-weight: 600; color: var(--ink-2); }
+
+/* thread 카드 두 장: 이름, register, 동작 3줄 */
+.th2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.tc { min-width: 0; padding: 8px; border: 1px solid var(--grey-200); border-radius: 12px; }
+.tc.run { border-color: var(--blue); }
+.tc h3 { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+.cpu { height: 20px; padding: 0 6px; border-radius: 6px; background: var(--grey-100); font-size: 12px; font-weight: 700; line-height: 20px; color: var(--grey-700); }
+.run .cpu { background: var(--blue); color: #fff; }
+.reg { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 10px; border-radius: 8px; background: var(--grey-100); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.reg b { font-size: 17px; color: var(--ink); }
+.reg b.none { color: var(--mute); }
+
+/* 동작 줄: 끝낸 것은 파란 점, 방금 한 것은 파란 칸, 아직은 회색 점 */
+.ops { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.ops li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; min-height: 36px; padding: 4px 8px 4px 22px; position: relative; border-radius: 8px; border: 1px solid transparent; font-size: 13px; line-height: 1.35; color: var(--ink-2); }
+.ops li::before { content: ""; position: absolute; left: 8px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--grey-200); }
+.ops li b { font-size: 13px; font-weight: 700; }
+.ops li small { font-size: 12px; }
+.ops li.done { color: var(--ink); }
+.ops li.done::before { background: var(--blue); }
+.ops li.now { border-color: var(--blue); background: var(--blue-50); color: var(--ink); }
+.ops li.now::before { background: var(--blue); }
+
+/* 맨 아래: 기대 값과 맞는지 */
+.exp { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; margin-top: 10px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.exp b { font-size: 17px; color: var(--ink); }
+.vd { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 14px; font-weight: 700; line-height: 28px; }
+.vd.ok { background: var(--blue-50); color: var(--accent-text); }
+.vd.bad { background: var(--red-50); color: var(--red); }
+
+/* 직접 해 보기: 고르는 칸 */
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 15px; }
+.sim-row select:focus { border-color: var(--accent-text); }
+.sim-err { min-height: 20px; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--red); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>경쟁 상태</h1>
+  </header>
+  <a class="sim-q" data-q="03-os/6"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>동기화 문제와 해결</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>context switch가 끼어드는 지점을 고르고 시작 값을 넣으면, 그대로 실행한 결과가 기대 값과 맞는지 보여 줘요.</p>
+    <div class="sim-row">
+      <select name="cut" aria-label="context switch가 끼어드는 지점">
+        <option value="1">A가 load한 직후에 끼어들기</option>
+        <option value="2">A가 값을 올린 직후에 끼어들기</option>
+        <option value="3">A가 store한 직후에 끼어들기</option>
+        <option value="0">끼어들지 않기</option>
+      </select>
+    </div>
+    <div class="sim-row">
+      <input name="v" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" placeholder="시작 값 0~99" aria-label="likes 시작 값(숫자)">
+      <button class="sim-btn">실행</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="sim-err" id="err" role="alert"></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시: 공유 변수 likes에 thread A, B가 각자 likes++ 한 번씩. 동작 3개 = load, 올리기, store
+const OPS = [['load', '메모리 → register'], ['올리기', 'register 값 + 1'], ['store', 'register → 메모리']];
+const OTHER = { A: 'B', B: 'A' };
+
+// 시작 값 v0, 끼어드는 지점 cut(0은 안 끼어듦)으로 모든 단계를 만든다
+function build(v0, cut) {
+  const s = { mem: v0, reg: { A: null, B: null }, done: { A: 0, B: 0 } };
+  const steps = [];
+  const exp = v0 + 2;
+  // 지금 상태를 그대로 복사해 한 단계로 쌓는다
+  const push = (caption, run, now = null, extra = {}) => steps.push({
+    caption, run, now, exp, v0, ...extra,
+    mem: s.mem, reg: { ...s.reg }, done: { ...s.done },
+  });
+  // thread t가 n번째 동작을 한다
+  const doOp = (t, n) => {
+    if (n === 1) s.reg[t] = s.mem;
+    if (n === 2) s.reg[t] += 1;
+    if (n === 3) s.mem = s.reg[t];
+    s.done[t] = n;
+    const r = s.reg[t];
+    push([
+      `${t}가 메모리 값을 자기 register로 읽어 왔어요. register 값 ${r}.`,
+      `${t}가 register 값을 하나 올렸어요. 이제 ${r}.`,
+      `${t}가 register 값을 메모리에 저장했어요. 메모리 값 ${s.mem}.`,
+    ][n - 1], t, [t, n]);
+  };
+  // CPU가 from에서 to로 넘어간다
+  const swap = (from, to) => push(
+    !cut ? `${from}가 끝나서 ${to}가 이어받아요. 둘이 겹치지 않아요.`
+      : s.done[from] === 3 ? `context switch로 CPU가 ${to}에게 넘어가요. ${from}는 이미 끝났어요.`
+      : `context switch로 CPU가 ${to}에게 넘어가요. ${from}의 register 값은 그대로예요.`, to);
+
+  push(`thread 두 개가 공유 변수를 한 번씩 올려요. 시작 값 ${v0}, 기대 결과 ${exp}.`, 'A');
+  const firstA = cut || 3;
+  for (let n = 1; n <= firstA; n++) doOp('A', n);
+  swap('A', 'B');
+  for (let n = 1; n <= 3; n++) doOp('B', n);
+  if (firstA < 3) { swap('B', 'A'); for (let n = firstA + 1; n <= 3; n++) doOp('A', n); }
+
+  const ok = s.mem === exp;
+  push(ok ? `결과는 ${s.mem}, 기대는 ${exp}. 값이 맞아요. 두 thread가 차례로 실행됐어요.`
+    : `결과는 ${s.mem}, 기대는 ${exp}. 마지막 저장이 앞선 결과를 덮어써서 증가 한 번이 사라졌어요.`,
+    null, null, { final: ok ? 'ok' : 'bad' });
+  return steps;
+}
+
+// 그리기: 메모리 칸 + thread 카드 두 장 + 기대 값 줄
+function render(s, stage) {
+  const nowOp = s.now && s.now[1];
+  const card = t => `
+    <div class="tc${s.run === t ? ' run' : ''}">
+      <h3>thread ${t}<span class="cpu">${s.run === t ? 'CPU 사용' : '대기'}</span></h3>
+      <div class="reg">register <b class="num${s.reg[t] === null ? ' none' : ''}${s.now && s.now[0] === t && nowOp < 3 ? ' sim-pop' : ''}">${s.reg[t] === null ? '-' : s.reg[t]}</b></div>
+      <ol class="ops">${OPS.map(([name, desc], i) => {
+        const cls = s.now && s.now[0] === t && s.now[1] === i + 1 ? ' now' : s.done[t] > i ? ' done' : '';
+        return `<li class="${cls.trim()}"><b>${name}</b><small>${desc}</small></li>`;
+      }).join('')}</ol>
+    </div>`;
+  stage.innerHTML = `
+    <div class="mem${nowOp === 1 || nowOp === 3 ? ' hl' : ''}"><small>메모리 (공유 변수)</small><b class="num${nowOp === 3 ? ' sim-pop' : ''}">${s.mem}</b><span>likes</span></div>
+    <div class="th2">${card('A')}${card('B')}</div>
+    <div class="exp"><span>기대 결과 <b class="num">${s.exp}</b></span>${s.final ? `<span class="vd ${s.final}">${s.final === 'ok' ? '맞아요' : '틀렸어요'}</span>` : ''}</div>`;
+}
+
+// 직접 해 보기: 고른 지점과 시작 값으로 처음부터 끝까지 만들어 자동 재생
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const raw = e.target.v.value.trim(), err = document.getElementById('err');
+  // 시작 값은 비우면 지금 보이는 값, 넣었다면 0~99 숫자만
+  if (raw && !/^\d{1,2}$/.test(raw)) { err.textContent = '시작 값은 0에서 99 사이 숫자로 넣어 주세요.'; return; }
+  err.textContent = '';
+  Sim.load(build(raw ? Number(raw) : Sim.step().v0, Number(e.target.cut.value)));
+  Sim.play(true);
+  e.target.v.value = '';
+});
+
+Sim.start({ steps: build(4, 1), render });
+</script>
+</body>
+</html>

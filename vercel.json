@@ -1,0 +1,6 @@
+{
+  "buildCommand": "python3 scripts/build.py",
+  "outputDirectory": "app",
+  "installCommand": "",
+  "framework": null
+}

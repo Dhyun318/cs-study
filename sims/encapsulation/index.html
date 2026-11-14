@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>캡슐화와 역캡슐화</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 데이터 덩어리 상자: 위에 방향과 단위 이름, 아래에 헤더 칩들 */
+.pdu { min-height: 112px; padding: 10px; border: 1px solid var(--grey-200); border-radius: 12px; }
+.pdu-h { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.pdu-h .side { display: inline-flex; align-items: center; gap: 3px; }
+.pdu-h .sim-ic { width: 14px; height: 14px; }
+.pdu-h b { color: var(--accent-text); }
+.chips { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 3px; min-height: 59px; }
+.chip { padding: 5px 7px; border: 1px solid var(--grey-200); border-radius: 6px; background: var(--grey-100); font-size: 12px; font-weight: 600; line-height: 16px; color: var(--grey-800); }
+.chip.d { border-color: var(--blue); background: var(--blue-50); color: var(--accent-text); }
+.chip.gone { border-style: dashed; background: none; color: var(--ink-2); text-decoration: line-through; }
+.bits { padding: 14px 4px; font-size: 16px; font-weight: 700; letter-spacing: 0.06em; color: var(--grey-800); }
+
+/* 계층 사다리: 왼쪽 TCP/IP 묶음, 가운데 OSI 7계층, 오른쪽 프로토콜 */
+.lad { display: grid; grid-template-columns: 74px 1fr 84px; grid-template-rows: 16px repeat(7, 28px); gap: 4px; margin-top: 10px; }
+.th { font-size: 12px; font-weight: 600; color: var(--ink-2); text-align: center; }
+.gc, .pc, .rw { border: 1px solid transparent; border-radius: 8px; background: var(--grey-100); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.pc span span { white-space: nowrap; }
+.gc, .pc { display: grid; place-items: center; padding: 0 4px; line-height: 1.3; text-align: center; }
+.rw { display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border-color: var(--grey-200); background: var(--bg); font-size: 14px; color: var(--ink); text-align: left; }
+.rw .sim-ic { width: 16px; height: 16px; }
+.rw.cur { border-color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--accent-text); color: var(--accent-text); }
+.hl { border-color: var(--blue); background: var(--blue-50); color: var(--accent-text); }
+.hint { min-height: 36px; margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--ink-2); }
+
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-row select:focus { border-color: var(--accent-text); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>캡슐화와 역캡슐화</h1>
+  </header>
+  <a class="sim-q" data-q="05-network/1"><span><small>관련 질문</small><b>계층 구조와 캡슐화</b></span></a>
+  <a class="sim-q" data-q="05-network/2" style="margin-top: 8px"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>전송 계층 TCP와 UDP</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>보낼 데이터 종류를 고르면 보통 쓰는 전송 프로토콜로 처음부터 재생해요. 웹은 TCP, 영상 통화는 UDP예요.</p>
+    <div class="sim-row">
+      <select name="app" aria-label="보낼 데이터 종류"></select>
+      <button class="sim-btn">보내기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// OSI 7계층과 TCP/IP 4계층 묶음, 묶음별 프로토콜 (from = 첫 계층 번호, len = 묶인 계층 수)
+const LAYERS = ['응용', '표현', '세션', '전송', '네트워크', '데이터 링크', '물리'];
+const GROUPS = [
+  { n: '응용', from: 0, len: 3, p: 'HTTP, SMTP, FTP, DNS' },
+  { n: '전송', from: 3, len: 1, p: 'TCP, UDP' },
+  { n: '인터넷', from: 4, len: 1, p: 'IP, ICMP' },
+  { n: '네트워크 인터페이스', from: 5, len: 2, p: 'Ethernet, Wi-Fi' },
+];
+const GROUP_OF = LAYERS.map((_, i) => GROUPS.findIndex(g => i >= g.from && i < g.from + g.len));
+
+// 보낼 데이터 종류와 보통 쓰는 전송 프로토콜
+const APPS = [
+  { k: '웹', d: 'HTTP 데이터', tp: 'TCP' },
+  { k: '메일', d: 'SMTP 데이터', tp: 'TCP' },
+  { k: '파일', d: 'FTP 데이터', tp: 'TCP' },
+  { k: '이름 조회', d: 'DNS 데이터', tp: 'UDP' },
+  { k: '영상 통화', d: '영상 데이터', tp: 'UDP' },
+];
+
+// 한 모드(TCP 또는 UDP)의 단계 14개: 내려가며 헤더 붙이기 7개, 올라가며 떼기 7개
+function build(tp, app) {
+  const seg = tp === 'TCP' ? ['세그먼트(segment)가', 'segment'] : ['데이터그램(datagram)이', 'datagram'];
+  // 칩 목록: o = 이 칩을 붙이는 계층 번호 (바깥쪽 칩이 앞)
+  const chips = [
+    { t: 'Eth 헤더', o: 5 }, { t: 'IP 헤더', o: 4 }, { t: `${tp} 헤더`, o: 3 },
+    { t: '세션 헤더', o: 2 }, { t: '표현 헤더', o: 1 }, { t: app.d, o: 0, d: 1 }, { t: 'Eth 트레일러', o: 5 },
+  ];
+  const unit = ['message', 'message', 'message', seg[1], 'packet', 'frame', '비트'];
+  const down = [
+    `보내는 쪽 응용 계층이 ${app.k} 데이터를 준비해요. (전송: ${tp})`,
+    '표현 계층이 헤더를 앞에 붙여요. 이렇게 감싸는 것이 캡슐화예요.',
+    '세션 계층 헤더도 붙어요. TCP/IP는 위 세 계층을 응용 하나로 묶어요.',
+    `${tp} 헤더가 붙어 ${seg[0]} 돼요. 프로세스끼리 통신을 맡는 계층이에요.`,
+    'IP 헤더가 붙어 패킷(packet)이 돼요. 호스트에서 호스트로 옮기는 계층이에요.',
+    '데이터 링크 계층은 앞에 헤더, 뒤에 트레일러를 붙여 프레임(frame)을 만들어요.',
+    '물리 계층이 프레임을 비트 신호로 바꿔 케이블로 보내요.',
+  ];
+  const up = [
+    '응용 계층에는 처음 데이터만 남았어요. 이 과정이 역캡슐화예요.',
+    '표현 계층이 자기 헤더를 읽고 떼어내요.',
+    '세션 계층이 자기 헤더를 읽고 떼어내요.',
+    `전송 계층이 ${tp} 헤더를 읽고 떼어내요.`,
+    '네트워크 계층이 IP 헤더를 읽고 떼어내요.',
+    '데이터 링크 계층이 헤더와 트레일러를 읽고 떼어내요.',
+    '받는 쪽 물리 계층에 비트가 도착해요. 여기서 역캡슐화가 시작돼요.',
+  ];
+  const sent = LAYERS.map((_, i) => ({
+    caption: down[i], layer: i, recv: false, unit: unit[i], bits: i === 6,
+    chips: chips.filter(c => c.o <= i).map(c => ({ ...c, pop: c.o === i })),
+  }));
+  const got = [6, 5, 4, 3, 2, 1, 0].map(i => ({
+    caption: up[i], layer: i, recv: true, unit: i === 6 ? '비트' : unit[Math.max(i - 1, 0)], bits: i === 6,
+    chips: chips.filter(c => c.o <= i).map(c => ({ ...c, gone: i > 0 && c.o === i })),
+  }));
+  return [...sent, ...got];
+}
+
+const MODES = { TCP: build('TCP', APPS[0]), UDP: build('UDP', APPS[0]) };
+let focus = -1; // 눌러서 강조한 TCP/IP 묶음 번호 (-1이면 없음)
+
+const ARROW = {
+  down: '<svg class="sim-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M18 13l-6 6l-6 -6"/></svg>',
+  up: '<svg class="sim-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v-14M18 11l-6 -6l-6 6"/></svg>',
+};
+
+// 그리기: 데이터 덩어리 상자 + 계층 사다리 + 안내 줄
+function render(s, stage) {
+  const chips = s.bits ? '<span class="bits sim-pop num">1011 0010 0110 ...</span>'
+    : s.chips.map(c => `<span class="chip${c.d ? ' d' : ''}${c.gone ? ' gone' : ''}${c.pop ? ' sim-pop' : ''}">${c.t}</span>`).join('');
+  stage.innerHTML = `
+    <div class="pdu">
+      <div class="pdu-h"><span class="side">${s.recv ? ARROW.up + '받는 쪽 · 역캡슐화' : ARROW.down + '보내는 쪽 · 캡슐화'}</span><span>단위 <b>${s.unit}</b></span></div>
+      <div class="chips">${chips}</div>
+    </div>
+    <div class="lad">
+      <span class="th">TCP/IP</span><span class="th">OSI 7계층</span><span class="th">프로토콜</span>
+      ${GROUPS.map((g, n) => `
+        <button type="button" class="gc" data-g="${n}" style="grid-column:1; grid-row:${g.from + 2} / span ${g.len}">${g.n}</button>
+        <button type="button" class="pc" data-g="${n}" style="grid-column:3; grid-row:${g.from + 2} / span ${g.len}">${'<span>' + g.p.split(', ').map(x => `<span>${x}</span>`).join(', ') + '</span>'}</button>`).join('')}
+      ${LAYERS.map((name, i) => `
+        <button type="button" class="rw${i === s.layer ? ' cur' : ''}" data-g="${GROUP_OF[i]}" style="grid-column:2; grid-row:${i + 2}">${name}${i === s.layer ? (s.recv ? ARROW.up : ARROW.down) : ''}</button>`).join('')}
+    </div>
+    <p class="hint"></p>`;
+  applyFocus(stage);
+}
+
+// 강조: 같은 TCP/IP 묶음의 칸들을 같이 켜고 안내 줄을 바꾼다 (다시 그리지 않아 움직임이 되풀이되지 않는다)
+function applyFocus(stage) {
+  stage.querySelectorAll('[data-g]').forEach(el => {
+    el.classList.toggle('hl', Number(el.dataset.g) === focus);
+    el.setAttribute('aria-pressed', Number(el.dataset.g) === focus);
+  });
+  const g = GROUPS[focus];
+  stage.querySelector('.hint').textContent = g
+    ? `TCP/IP ${g.n} 계층은 OSI ${LAYERS.slice(g.from, g.from + g.len).join(', ')} 계층에 해당해요. 프로토콜: ${g.p}.`
+    : '계층 칸을 눌러 보세요. 같은 TCP/IP 묶음과 프로토콜이 같이 켜져요.';
+}
+
+document.getElementById('sim-stage').addEventListener('click', e => {
+  const el = e.target.closest('[data-g]');
+  if (!el) return;
+  const g = Number(el.dataset.g);
+  focus = focus === g ? -1 : g;
+  applyFocus(e.currentTarget);
+});
+
+// 직접 해 보기: 고른 데이터 종류로 두 모드의 단계를 다시 만들고, 그 프로토콜 탭을 눌러 처음부터 재생
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const a = APPS[Number(e.target.app.value)];
+  if (!a) return;
+  Object.keys(MODES).forEach(tp => MODES[tp].splice(0, MODES[tp].length, ...build(tp, a)));
+  [...document.querySelectorAll('.sim-tabs button')].find(b => b.textContent === a.tp).click();
+  Sim.play(true);
+});
+
+// 선택 칸 채우기
+const sel = document.querySelector('#try select');
+APPS.forEach((a, i) => sel.add(new Option(`${a.k} (${a.tp})`, i)));
+
+Sim.start({ modes: MODES, render });
+</script>
+</body>
+</html>

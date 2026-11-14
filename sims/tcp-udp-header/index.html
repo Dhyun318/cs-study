@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCP 헤더와 UDP 헤더 비교</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 헤더 카드: 제목 + 크기 막대 + 칸 칩 */
+.hd { padding: 10px 12px 12px; border: 1px solid var(--grey-200); border-radius: 14px; }
+.hd + .hd { margin-top: 8px; }
+.hd.dim { opacity: .45; }
+.hd-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hd-top b { font-size: 15px; font-weight: 700; }
+.hd-top small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+
+/* 크기 막대: 칸 수가 아니라 바이트 크기. 비율 모드에서는 헤더(파랑) + 데이터(회색) */
+.bar { display: flex; height: 8px; margin: 6px 0 10px; border-radius: 4px; background: var(--grey-200); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--grey-700); }
+.bar.on i, .bar.ratio i { background: var(--blue); }
+.bar.ratio i { min-width: 3px; }
+
+/* 칸 칩: 눌러서 역할을 본다 */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch { max-width: 100%; min-height: 34px; padding: 5px 10px; border: 1px solid transparent; border-radius: 8px; background: var(--grey-100); font-size: 13px; font-weight: 600; color: var(--grey-800); text-align: left; }
+.ch.on { border-color: var(--blue); background: var(--blue-50); color: var(--accent-text); }
+.ch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--blue); }
+
+/* 칸 설명 상자 */
+.dt { margin-top: 8px; min-height: 76px; padding: 10px 12px; border: 1.5px dashed var(--grey-200); border-radius: 14px; }
+.dt b { font-size: 15px; font-weight: 700; }
+.dt small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.dt p { margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--grey-900); }
+.dt .nil { color: var(--ink-2); }
+
+/* 직접 해 보기: 오류 문구, 이어 보기 줄 */
+.err { min-height: 20px; margin-top: 8px !important; font-size: 13px !important; font-weight: 600; color: var(--red) !important; }
+.more { display: grid; gap: 8px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>TCP 헤더와 UDP 헤더 비교</h1>
+  </header>
+  <a class="sim-q" data-q="05-network/2"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>TCP와 UDP 비교</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>보낼 데이터 크기를 넣으면 헤더가 차지하는 비율을 TCP와 UDP로 비교해요. TCP는 최소 20바이트 기준이에요. 위 그림의 칸을 누르면 역할도 볼 수 있어요.</p>
+    <div class="sim-row">
+      <input name="n" inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" required placeholder="예: 100 (바이트)" aria-label="보낼 데이터 크기(바이트)">
+      <button class="sim-btn">비교</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset(); err.textContent = ''">처음부터</button>
+    </div>
+    <p class="err" id="err" role="alert"></p>
+  </form>
+
+  <div class="more">
+    <a class="sim-q" href="../tcp-handshake/index.html"><span><small>이어서 보기</small><b>TCP 연결 맺기와 끊기</b></span></a>
+    <a class="sim-q" href="../tcp-udp-order/index.html"><span><small>이어서 보기</small><b>TCP와 UDP의 패킷 순서</b></span></a>
+  </div>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 칸 정보: [이름, 한국어 이름, 어디에 있는지, 역할]
+const BOTH = 'TCP, UDP 모두 있어요', ONLY = 'TCP에만 있어요';
+const F = {
+  sport: ['Source port', '출발지 포트', BOTH, '보내는 쪽 프로세스를 가리키는 포트 번호예요.'],
+  dport: ['Destination port', '목적지 포트', BOTH, '받는 쪽 프로세스를 가리키는 포트 번호예요.'],
+  seq: ['Sequence number', '순서 번호', ONLY, '보낸 데이터의 순서를 표시해요. 받는 쪽이 순서를 맞출 때 써요.'],
+  ack: ['Acknowledgement number', '확인 번호', ONLY, '어디까지 받았는지 알려 줘요. 확인이 제때 안 오면 보내는 쪽이 재전송해요.'],
+  hlen: ['HLEN', '', ONLY, 'UDP 헤더에는 없는 칸이에요. 이 칸 때문에도 TCP 헤더가 커져요.'],
+  res: ['Reserved', '', ONLY, 'UDP 헤더에는 없는 칸이에요. 이 칸 때문에도 TCP 헤더가 커져요.'],
+  ctrl: ['Control', '제어 플래그', ONLY, 'SYN, ACK, FIN 같은 플래그가 들어 있어요. 연결을 맺고 끊는 제어에 써요.'],
+  win: ['Window size', '윈도 크기', ONLY, '수신자 버퍼가 넘치지 않게 보내는 양을 조절해요. 이게 흐름 제어예요.'],
+  cks: ['Checksum', '검사합', BOTH, '데이터가 훼손됐는지 검사해요. UDP가 가진 오류 검사는 이것뿐이에요.'],
+  urg: ['Urgent pointer', '', ONLY, 'UDP 헤더에는 없는 칸이에요. 이 칸 때문에도 TCP 헤더가 커져요.'],
+  len: ['Total length', '길이', 'UDP에만 있어요', 'UDP 데이터그램의 길이를 담아요.'],
+};
+const TCP = ['sport', 'dport', 'seq', 'ack', 'hlen', 'res', 'ctrl', 'win', 'cks', 'urg'];
+const UDP = ['sport', 'dport', 'len', 'cks'];
+const TCP_ONLY = ['seq', 'ack', 'hlen', 'res', 'ctrl', 'win', 'urg'];
+const HDR = { TCP: ['TCP 헤더', '최소 20바이트', 20], UDP: ['UDP 헤더', '8바이트', 8] };
+
+// 단계: hl = 강조할 칸, udp = UDP 카드 보임, size = 크기 막대 강조, ratio = 비율 모드 {n, pct}
+const step = (caption, o = {}) => ({ caption, hl: [], udp: true, ...o });
+const STEPS = [
+  step('TCP 헤더는 칸이 열 개예요. 크기는 최소 20바이트예요.', { udp: false }),
+  step('UDP 헤더는 칸이 네 개예요. 크기는 8바이트로 훨씬 작아요.'),
+  step('두 헤더에 다 있는 칸은 포트 둘과 checksum이에요. 포트로 받을 프로세스를 구분해요.', { hl: ['sport', 'dport', 'cks'] }),
+  step('UDP에 없는 칸 일곱 개는 TCP에만 있어요. 그중 네 칸을 차례로 볼게요.', { hl: TCP_ONLY }),
+  step('순서 번호와 확인 번호가 순서와 수신 확인을 맡아요. 어디까지 받았는지 서로 알려 줘요.', { hl: ['seq', 'ack'] }),
+  step('Window size는 수신자 버퍼가 넘치지 않게 보내는 양을 조절해요. 흐름 제어예요.', { hl: ['win'] }),
+  step('Control에는 SYN, ACK, FIN 같은 플래그가 있어요. 연결을 맺고 끊는 제어에 써요.', { hl: ['ctrl'] }),
+  step('칸이 많은 만큼 TCP 헤더가 커요. 이 크기 차이가 곧 오버헤드 차이예요.', { size: true }),
+];
+
+// 막대 하나: 크기 모드는 20바이트 기준 길이, 비율 모드는 헤더 비율
+function bar(k, s) {
+  if (s.ratio) return `<div class="bar ratio" aria-hidden="true"><i style="width:${s.ratio.pct[k]}%"></i></div>`;
+  return `<div class="bar${s.size ? ' on' : ''}" aria-hidden="true"><i style="width:${HDR[k][2] * 5}%"></i></div>`;
+}
+
+// 카드 하나: 제목 + 크기 + 막대 + 칩
+function card(k, ids, s, picked) {
+  const side = s.ratio ? (s.ratio.label ? `헤더 ${s.ratio.pct[k].toFixed(1)}%` : `헤더 ${HDR[k][2]}바이트`) : HDR[k][1];
+  const dim = k === 'UDP' && !s.udp;
+  return `<div class="hd${dim ? ' dim' : ''}"><div class="hd-top"><b>${HDR[k][0]}</b><small class="num">${side}</small></div>${bar(k, s)}
+    <div class="chips">${ids.map(id => `<button type="button" class="ch${s.hl.includes(id) ? ' on' : ''}" data-f="${id}" data-k="${k}" aria-pressed="${picked === k + id}">${F[id][0]}</button>`).join('')}</div></div>`;
+}
+
+// 그리기: TCP 카드, UDP 카드, 눌러 본 칸의 설명 (단계가 바뀌면 눌러 본 칸은 지운다)
+let last, picked = null;
+function render(s, stage) {
+  if (s !== last) { last = s; picked = null; }
+  const f = picked && F[picked.slice(3)];
+  stage.innerHTML = `${card('TCP', TCP, s, picked)}${card('UDP', UDP, s, picked)}
+    <div class="dt">${f
+      ? `<b>${f[0]}</b>${f[1] ? `<small>${f[1]}</small>` : ''}<p>${f[3]} (${f[2]})</p>`
+      : '<p class="nil">칸을 누르면 역할이 나와요.</p>'}</div>`;
+}
+
+// 칸을 누르면 같은 단계 그대로 설명만 바꾼다 (다시 누르면 닫힘)
+document.getElementById('sim-stage').addEventListener('click', e => {
+  const b = e.target.closest('.ch');
+  if (!b) return;
+  const key = b.dataset.k + b.dataset.f;
+  picked = picked === key ? null : key;
+  render(Sim.step(), e.currentTarget);
+});
+
+// 직접 해 보기: 데이터 크기 n 바이트일 때 헤더 비율(헤더 / 전체)
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const n = Number(e.target.n.value), err = document.getElementById('err');
+  if (!Number.isInteger(n) || n < 1 || n > 99999) { err.textContent = '1부터 99999 사이 숫자를 넣어 주세요.'; return; }
+  err.textContent = '';
+  const pct = { TCP: 2000 / (20 + n), UDP: 800 / (8 + n) };
+  const t = pct.TCP.toFixed(1), u = pct.UDP.toFixed(1);
+  Sim.load([
+    step(`데이터 ${n}바이트를 보내요. 앞에 TCP는 20바이트, UDP는 8바이트 헤더가 붙어요.`, { ratio: { pct, label: false } }),
+    step(`전체 크기에서 헤더가 차지하는 비율이에요. TCP ${t}%, UDP ${u}%.`, { ratio: { pct, label: true } }),
+  ]);
+  Sim.play(true);
+  e.target.reset();
+});
+
+Sim.start({ steps: STEPS, render });
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# 책 원본 자료(저작권): 원본 PDF, 원문 md, 책 그림, 옛 시안. 공개 레포에 올리지 않는다
+_reference/
+*.pdf
+
+# 빌드 결과물 (python3 scripts/build.py 가 다시 만든다, 버셀이 배포 때 만든다)
+app/data/
+app/sims/
+app/illustrations/
+
+# 도구 캐시
+.omc/
+.claude/
+graphify-out/
+.vercel/
+__pycache__/
+node_modules/
+.DS_Store

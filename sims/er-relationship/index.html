@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1:N, N:M 관계와 PK/FK 연결</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위쪽 table 줄(1개 또는 2개), 연결선 줄, 아래쪽 table */
+.top, .cns { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 8px; }
+.tt { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tw { overflow: hidden; border: 1.5px solid var(--grey-200); border-radius: 12px; }
+.kt { width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; }
+.kt th, .kt td { padding: 0; border-bottom: 1px solid var(--grey-200); }
+.kt tr:last-child td { border-bottom: 0; }
+.kt thead th { background: var(--grey-100); }
+.kh { display: block; min-height: 40px; padding: 4px 2px; font-size: 12px; font-weight: 700; line-height: 1.3; }
+.kt button { display: block; width: 100%; height: 26px; padding: 0 2px; border: 0; background: none; font: inherit; color: inherit; white-space: nowrap; }
+
+/* 키 꼬리표: 열 이름 아래 */
+.tag { display: block; min-height: 16px; margin: 2px 2px 0; border-radius: 6px; font-size: 11px; font-style: normal; font-weight: 700; line-height: 16px; }
+.tag.pk { background: var(--cta); color: #fff; }
+.tag.fk { background: var(--bg); color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--blue); }
+.tag.pf { background: var(--blue-50); color: var(--accent-text); }
+
+/* 강조: 가리킨 열, 이어진 행, 고른 행, 한 칸에 값이 둘인 칸 */
+.kt td.hc { background: var(--blue-50); }
+.kt th.hc .kh { background: var(--blue-50); color: var(--accent-text); }
+.kt tr.hr td { background: var(--blue-50); color: var(--accent-text); font-weight: 700; }
+.kt tr.sel td { background: var(--cta); color: #fff; font-weight: 700; }
+.kt td.bad { background: var(--red-50); color: var(--red); font-weight: 700; }
+
+/* 연결선: 위 table 아래에서 아래 table로 내려가는 선 + 1:N 꼬리표 */
+.cn { position: relative; height: 28px; display: grid; place-items: center; }
+.cn.on::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: var(--blue); }
+.cn span { position: relative; padding: 1px 8px; border-radius: 6px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--blue); font-size: 11px; font-weight: 700; color: var(--accent-text); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>1:N, N:M 관계와 PK/FK 연결</h1>
+  </header>
+  <a class="sim-q" data-q="04-database/2"><span><small>관련 질문</small><b>1:N과 N:M 관계 풀기</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>table의 행을 눌러 보세요. 고른 행에서 PK와 FK를 따라 이어진 행이 같이 강조되고, 문장이 나와요.</p>
+    <div class="sim-row">
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 table(직접 만든 값). 첫 열이 PK, tags는 열 번호별 꼬리표
+const DATA = {
+  member: { title: 'member (동아리 회원)', cols: ['member_id', '이름'], tags: { 0: 'PK' },
+    rows: [[1, '연우'], [2, '하람'], [3, '이안']] },
+  loan: { title: 'loan (도서 대출)', cols: ['loan_id', 'member_id', '도서'], tags: { 0: 'PK', 1: 'FK' },
+    rows: [[101, 1, '파이썬 입문'], [102, 2, '정원 가꾸기'], [103, 1, '별자리 도감'], [104, 3, '수학 퍼즐'], [105, 1, '요리 노트']] },
+  dish: { title: 'dish (요리)', cols: ['dish_id', '이름'], tags: { 0: 'PK' },
+    rows: [[1, '된장국'], [2, '달걀찜'], [3, '볶음밥']] },
+  item: { title: 'item (재료)', cols: ['item_id', '이름'], tags: { 0: 'PK' },
+    rows: [[1, '두부'], [2, '대파'], [3, '달걀'], [4, '밥']] },
+  link: { title: 'dish_item (연결 table)', cols: ['dish_id', 'item_id'], tags: { 0: 'PK·FK', 1: 'PK·FK' },
+    rows: [[1, 1], [1, 2], [2, 2], [2, 3], [3, 3], [3, 4]] },
+};
+// FK 연결: c table의 cc번 열이 p table의 PK(0번 열)를 가리킨다
+const EDGES = [{ c: 'loan', cc: 1, p: 'member' }, { c: 'link', cc: 0, p: 'dish' }, { c: 'link', cc: 1, p: 'item' }];
+const TAGCLS = { PK: 'pk', FK: 'fk', 'PK·FK': 'pf' };
+const LAY1 = { top: ['member'], bottom: 'loan' };
+const LAY2 = { top: ['dish', 'item'], bottom: 'link' };
+
+const pkRow = (p, v) => DATA[p].rows.findIndex(r => r[0] === v);
+const eun = w => (w.charCodeAt(w.length - 1) - 44032) % 28 ? '은' : '는'; // 받침 있으면 은, 없으면 는
+const names = (t, ids) => ids.map(i => DATA[t].rows[i][1]).join(', ');
+
+// 고른 행(t, r)에서 FK 연결을 따라가 함께 강조할 행을 table별로 모은다
+function follow(t, r) {
+  const hl = {}, add = (n, i) => { (hl[n] ||= []).includes(i) || hl[n].push(i); };
+  const row = DATA[t].rows[r];
+  // 고른 행이 FK를 가지면 가리키는 PK 행을 찾는다
+  EDGES.filter(e => e.c === t).forEach(e => add(e.p, pkRow(e.p, row[e.cc])));
+  // 고른 행이 PK이면 그것을 가리키는 행을 찾고, 연결 table이면 반대쪽 PK 행도 찾는다
+  EDGES.filter(e => e.p === t).forEach(e => DATA[e.c].rows.forEach((cr, ci) => {
+    if (cr[e.cc] !== row[0]) return;
+    add(e.c, ci);
+    EDGES.filter(x => x.c === e.c && x !== e).forEach(x => add(x.p, pkRow(x.p, cr[x.cc])));
+  }));
+  return hl;
+}
+
+// 고른 행에 맞는 문장(실제 데이터로 만든다)
+const SAY = {
+  member: (r, h) => `${DATA.member.rows[r][0]}번 회원을 골랐어요. 대출 table에서 member_id 값이 같은 행은 ${h.loan.length}개예요.`,
+  loan: (r, h) => `대출 ${DATA.loan.rows[r][0]}번 행을 골랐어요. member_id 값을 따라가면 회원은 ${names('member', h.member)}, 한 명뿐이에요.`,
+  dish: (r, h) => { const n = DATA.dish.rows[r][1]; return `${n}${eun(n)} ${names('item', h.item)} 재료를 써요. 연결 행 ${h.link.length}개를 따라갔어요.`; },
+  item: (r, h) => { const n = DATA.item.rows[r][1]; return `${n}${eun(n)} ${names('dish', h.dish)} 요리에 써요. 연결 행 ${h.link.length}개를 따라갔어요.`; },
+  link: (r, h) => { const d = names('dish', h.dish); return `${d}${eun(d)} ${names('item', h.item)} 재료를 써요. 연결 행 하나가 둘을 이어요.`; },
+};
+
+// 단계 하나: lay(위/아래 table), caption, 열 강조(cols), 연결선(conn), 아래 table 숨김(nobot)
+const S = (lay, caption, o = {}) => ({ lay, caption, cols: {}, hl: {}, conn: true, ...o });
+// 행을 고른 단계: 이어진 행(hl)과 문장을 데이터에서 계산
+const pick = (lay, t, r, o = {}) => { const hl = follow(t, r); return S(lay, SAY[t](r, hl), { sel: { t, r }, hl, ...o }); };
+
+const KEYCOLS = { member: [0], loan: [1] };
+const MODES = {
+  '1:N': [
+    S(LAY1, '동아리 회원 table과 도서 대출 table이 있어요. 둘을 이어 볼게요.', { conn: false }),
+    S(LAY1, '회원 한 명이 책을 여러 번 빌려요. 그래서 1:N 관계예요.', { popConn: true }),
+    S(LAY1, 'N쪽인 대출 table에 member_id 열을 둬요. 회원 PK를 가리키는 FK예요.', { cols: KEYCOLS }),
+    pick(LAY1, 'member', 0, { cols: KEYCOLS }),
+    pick(LAY1, 'loan', 3, { cols: KEYCOLS }),
+  ],
+  'N:M': [
+    S(LAY2, '요리 하나에 재료가 여럿이고, 재료 하나도 여러 요리에 써요. N:M이에요.', { conn: false, nobot: true }),
+    S(LAY2, '재료 table에 dish_id 열을 넣어 봤어요. 대파와 달걀은 한 칸에 값이 둘이라 안 돼요.', { conn: false, nobot: true, direct: true, cols: { item: [2] } }),
+    S(LAY2, '가운데에 연결 table을 둬요. 한 행이 요리와 재료의 짝 하나예요.', { popConn: true }),
+    S(LAY2, '연결 table의 dish_id 열은 요리를, item_id 열은 재료를 가리키는 FK예요.', { cols: { link: [0, 1], dish: [0], item: [0] } }),
+    pick(LAY2, 'link', 2),
+    pick(LAY2, 'dish', 0),
+    pick(LAY2, 'item', 1),
+  ],
+};
+
+// table 하나 그리기: 열 이름 + 꼬리표, 행마다 칸 버튼
+function tbl(name, s) {
+  const T = DATA[name], on = (s.cols[name] || []).includes.bind(s.cols[name] || []);
+  const cols = [...T.cols], rows = T.rows.map(r => [...r]);
+  // 직접 넣기 단계: 재료마다 쓰이는 요리 번호를 한 칸에 모은다(값이 둘이면 빨갛게)
+  if (name === 'item' && s.direct) {
+    cols.push('dish_id');
+    rows.forEach(r => r.push(DATA.link.rows.filter(l => l[1] === r[0]).map(l => l[0]).join(', ')));
+  }
+  const linked = s.hl[name] || [], sel = s.sel && s.sel.t === name ? s.sel.r : -1;
+  return `<div class="tb"><p class="tt">${T.title}</p><div class="tw"><table class="kt">
+    <thead><tr>${cols.map((n, c) => `<th class="${on(c) ? 'hc' : ''}"><span class="kh">${n}<i class="tag ${TAGCLS[T.tags[c]] || ''}">${T.tags[c] || ''}</i></span></th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r, i) => `<tr class="${i === sel ? 'sel' : linked.includes(i) ? 'hr' : ''}">${r.map((v, c) => `
+      <td class="${on(c) ? 'hc' : ''}${s.direct && c === 2 && String(v).includes(',') ? ' bad' : ''}"><button class="num" data-t="${name}" data-r="${i}" aria-pressed="${i === sel}">${v}</button></td>`).join('')}</tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+// 그리기: 위 table(들) + 연결선 줄 + 아래 table
+function render(s, stage) {
+  const top = s.lay.top;
+  stage.style.minHeight = (s.lay === LAY2 ? 424 : 360) + 'px';
+  stage.innerHTML = `<div class="top" style="--n:${top.length}">${top.map(n => tbl(n, s)).join('')}</div>` + (s.nobot ? '' : `
+    <div class="cns" style="--n:${top.length}">${top.map(() => `<div class="cn${s.conn ? ' on' : ''}">${s.conn ? `<span class="${s.popConn ? 'sim-pop' : ''}">1 : N</span>` : ''}</div>`).join('')}</div>
+    ${tbl(s.lay.bottom, s)}`);
+}
+
+// 직접 해 보기: 행을 누르면 그 행에서 이어진 행을 따라간다(아래 table이 숨은 단계면 전체 그림으로)
+document.getElementById('sim-stage').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]');
+  if (b) Sim.load([pick(Sim.step().lay, b.dataset.t, Number(b.dataset.r))]);
+});
+
+Sim.start({ modes: MODES, render });
+</script>
+</body>
+</html>

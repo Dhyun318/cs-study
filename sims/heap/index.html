@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heap 삽입과 삭제</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위 줄: 힙 종류와 규칙 + 꺼낸 값 / 오류 꼬리표 */
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; min-height: 28px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.tag { padding: 3px 9px; border-radius: 8px; background: var(--blue-50); font-size: 13px; font-weight: 700; color: var(--accent-text); }
+.tag.bad { background: var(--red-50); color: var(--red); }
+
+/* 트리: 선은 svg, 노드는 퍼센트 위치의 버튼 */
+.tree { position: relative; height: 184px; margin-top: 4px; }
+.tree svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tree line { stroke: var(--grey-200); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.tn { position: absolute; width: 32px; height: 32px; margin-left: -16px; padding: 0; border: 1.5px solid var(--grey-200); border-radius: 50%; background: var(--bg); font-size: 13px; font-weight: 700; }
+.tn::after { content: ""; position: absolute; inset: -6px; }
+
+/* 배열: 0번부터 10번 칸. 위에 칸 번호, 아래에 값 */
+.arr { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; margin-top: 8px; }
+.ce { min-width: 0; height: 44px; display: grid; grid-template-rows: 16px 1fr; justify-items: center; align-items: center; padding: 0; border: 1px solid var(--grey-200); border-radius: 7px; background: var(--bg); font-size: 13px; font-weight: 700; }
+.ce small { font-size: 10px; font-weight: 600; color: var(--ink-2); }
+.ce:disabled { cursor: default; }
+.ce.off { border-style: dashed; background: none; }
+.ce.zero { background: var(--grey-100); color: var(--mute); }
+
+/* 강조: cur = 지금 움직이는 값, cmp = 비교 상대. sel/rel = 눌러 본 노드와 부모, 자식 */
+.cmp, .rel { border-color: var(--blue); background: var(--blue-50); }
+.cur, .sel { border-color: var(--cta); background: var(--cta); color: #fff; }
+.ce.cur small, .ce.sel small { color: #fff; }
+
+/* 눌러 본 노드 설명 */
+.info { min-height: 38px; margin-top: 8px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+.info b { color: var(--grey-900); }
+
+.grow { flex: 1; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Heap 삽입과 삭제</h1>
+  </header>
+  <a class="sim-q" data-q="02-data-structure/9"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>우선순위 큐와 힙</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>1부터 99까지 숫자를 넣거나 root를 꺼내 보세요. 지금 힙에서 이어서 보여 줘요. 노드는 10개까지예요.</p>
+    <div class="sim-row">
+      <input name="v" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" required placeholder="예: 42" aria-label="넣을 값(1부터 99)">
+      <button class="sim-btn">넣기</button>
+    </div>
+    <div class="sim-row">
+      <button type="button" class="sim-btn ghost grow" id="pop">root 꺼내기</button>
+      <button type="button" class="sim-btn ghost grow" id="again">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+const MAXN = 10; // 화면에 그릴 수 있는 노드 수
+// 힙 종류: better(a, b) = a가 b보다 위로 가야 하는가
+const MAX = { name: 'Max Heap', rule: '부모 ≥ 자식', cond: '크거나 같은', top: '최댓값', big: '큰', more: '더 커서', less: '크지 않아서', better: (a, b) => a > b };
+const MIN = { name: 'Min Heap', rule: '부모 ≤ 자식', cond: '작거나 같은', top: '최솟값', big: '작은', more: '더 작아서', less: '작지 않아서', better: (a, b) => a < b };
+
+// 단계 하나: a = 배열(0번 칸은 null), cur/cmp = 강조, out = 꺼낸 값, end = 이 동작이 끝난 뒤의 힙
+const step = (m, a, caption, o = {}) => ({ caption, a: a.slice(), max: m === MAX, end: a.slice(), ...o });
+
+// 삽입: 맨 끝에 넣고 부모보다 우선이면 자리를 바꾸며 올라간다
+function insertSteps(m, heap, v) {
+  const a = [...heap, v], out = [];
+  let i = a.length - 1;
+  out.push(step(m, a, `새 값(${v})을 맨 끝 ${i}번 칸에 넣어요. 다음 빈 자리가 거기예요.`, { cur: i, add: i }));
+  for (;;) {
+    if (i === 1) { out.push(step(m, a, 'root에 닿았어요. 올라갈 곳이 없어서 멈춰요.', { cur: i })); break; }
+    const p = i >> 1;
+    if (!m.better(a[i], a[p])) { out.push(step(m, a, `이 값이 부모(${a[p]})보다 ${m.less} 제자리에서 멈춰요.`, { cur: i, cmp: p })); break; }
+    out.push(step(m, a, `이 값이 부모(${a[p]})보다 ${m.more} 자리를 바꿔요.`, { cur: i, cmp: p }));
+    [a[i], a[p]] = [a[p], a[i]];
+    i = p;
+  }
+  out.forEach(s => { s.end = a.slice(); });
+  return out;
+}
+
+// 삭제: root를 꺼내고 마지막 값을 root로 옮긴 뒤, 우선인 자식과 바꾸며 내려간다
+function deleteSteps(m, heap) {
+  const a = heap.slice(), out = [];
+  if (a.length === 1) return [step(m, a, '힙이 비어 있어서 꺼낼 값이 없어요.', { err: '빈 힙' })];
+  const top = a[1];
+  out.push(step(m, a, `root가 ${m.top}이라서 이 값부터 꺼내요.`, { cur: 1 }));
+  if (a.length === 2) {
+    a.pop();
+    return [...out, step(m, a, '마지막 하나를 꺼냈어요. 이제 힙이 비었어요.', { out: top })];
+  }
+  const last = a.pop();
+  a[1] = last;
+  out.push(step(m, a, `마지막 노드(${last})를 root 자리로 옮겨요. 노드가 하나 줄어요.`, { cur: 1, out: top }));
+  let i = 1;
+  for (;;) {
+    const l = 2 * i, r = l + 1, size = a.length - 1;
+    if (l > size) { out.push(step(m, a, '맨 아래(leaf)에 닿았어요. 내려갈 곳이 없어서 멈춰요.', { cur: i, out: top })); break; }
+    const c = r <= size && m.better(a[r], a[l]) ? r : l;
+    if (!m.better(a[c], a[i])) {
+      out.push(step(m, a, `${r <= size ? '두 자식 모두' : '자식이'} 이 값보다 ${m.less} 멈춰요.`, { cur: i, cmp: c, out: top }));
+      break;
+    }
+    out.push(step(m, a, r <= size
+      ? `두 자식 중 ${m.big} 쪽(${a[c]})과 비교해요. 그 자식이 ${m.more} 바꿔요.`
+      : `자식(${a[c]})과 비교해요. 자식이 ${m.more} 자리를 바꿔요.`, { cur: i, cmp: c, out: top }));
+    [a[i], a[c]] = [a[c], a[i]];
+    i = c;
+  }
+  out.forEach(s => { s.end = a.slice(); });
+  return out;
+}
+
+// 값을 차례로 넣어 처음 힙을 만든다 (손으로 쓰지 않고 같은 함수로 계산)
+const build = (m, seq) => seq.reduce((h, v) => insertSteps(m, h, v).at(-1).end, [null]);
+
+// 모드 하나의 단계: 소개 4단계 + 삽입 + 삭제
+function modeSteps(m, seq, v) {
+  const h = build(m, seq), n = h.length - 1;
+  const s = 3, p = s >> 1, l = 2 * s, r = l + 1;
+  return [
+    step(m, h, `${m.name}은 부모가 자식보다 ${m.cond} 완전 이진 트리예요. 형제끼리는 순서가 없어요.`),
+    step(m, h, `root(1번 칸)는 항상 ${m.top}이에요. 확인은 O(1)이에요.`, { cur: 1 }),
+    step(m, h, '트리를 배열에 담아요. 0번 칸은 비우고, 1번부터 위에서 아래, 왼쪽에서 오른쪽 순서예요.'),
+    step(m, h, `${s}번 노드의 부모는 ${p}번(${s}/2), 자식은 ${l}번과 ${r}번(2×${s}, 2×${s}+1)이에요.`, { sel: s }),
+    ...insertSteps(m, h, v),
+    ...deleteSteps(m, insertSteps(m, h, v)[0].end),
+  ];
+}
+
+// 그리기: 위 줄 + 트리 + 배열 + 눌러 본 노드 설명
+let sel = null, seen = null;
+function render(s, stage) {
+  if (s !== seen) { seen = s; sel = s.sel ?? null; } // 단계가 바뀌면 눌러 본 노드를 비운다
+  const a = s.a, n = a.length - 1, m = s.max ? MAX : MIN;
+  const rel = sel ? [sel >> 1, 2 * sel, 2 * sel + 1].filter(i => i >= 1 && i <= n) : [];
+  // 칸 번호 i에 붙는 강조 클래스
+  const cls = i => sel ? (i === sel ? ' sel' : rel.includes(i) ? ' rel' : '') : (i === s.cur ? ' cur' : i === s.cmp ? ' cmp' : '') + (i === s.add ? ' sim-pop' : '');
+  // 트리 안 위치: 깊이 d, 그 줄에서 k번째 (x는 %, y는 px)
+  const pos = i => { const d = 31 - Math.clz32(i), k = i - (1 << d); return [(k + 0.5) / (1 << d) * 100, d * 48 + 20]; };
+  const lines = Array.from({ length: Math.max(n - 1, 0) }, (_, j) => { const i = j + 2, [x1, y1] = pos(i >> 1), [x2, y2] = pos(i); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`; }).join('');
+  const nodes = a.map((v, i) => { if (!i) return ''; const [x, y] = pos(i); return `<button type="button" class="tn num${cls(i)}" style="left:${x}%;top:${y - 16}px" data-i="${i}" aria-label="${i}번 노드, 값 ${v}">${v}</button>`; }).join('');
+  const cells = Array.from({ length: MAXN + 1 }, (_, i) => i === 0
+    ? '<button type="button" class="ce zero" disabled aria-label="0번 칸, 비워 둠"><small>0</small>/</button>'
+    : `<button type="button" class="ce num${i <= n ? cls(i) : ' off'}" data-i="${i}"${i > n ? ' disabled' : ''} aria-label="${i}번 칸${i <= n ? `, 값 ${a[i]}` : ', 비어 있음'}"><small>${i}</small>${i <= n ? a[i] : ''}</button>`).join('');
+  const kids = [2 * sel, 2 * sel + 1].filter(i => i <= n);
+  const info = !sel ? '노드나 칸을 누르면 부모와 자식이 표시돼요.'
+    : `<b>${sel}번</b> 부모 ${sel > 1 ? `${sel >> 1}번(${sel}/2)` : '없음(root)'}, 자식 ${kids.length ? `${kids.map(i => i + '번').join('과 ')}(2×${sel}, 2×${sel}+1)` : '없음(leaf)'}`;
+  stage.innerHTML = `
+    <div class="bar"><span>${m.name} · ${m.rule}</span>${s.err ? `<span class="tag bad"></span>` : s.out ? `<span class="tag num">꺼낸 값 ${s.out}</span>` : ''}</div>
+    <div class="tree"><svg viewBox="0 0 100 184" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${nodes}</div>
+    <div class="arr">${cells}</div>
+    <p class="info num">${info}</p>`;
+  if (s.err) stage.querySelector('.tag.bad').textContent = s.err; // 입력에서 온 글자가 아니라 고정 문구지만 textContent로 넣는다
+}
+
+// 노드나 칸을 누르면 부모, 자식을 강조 (다시 누르면 해제). 자동 재생은 멈춘다
+document.getElementById('sim-stage').addEventListener('click', e => {
+  const b = e.target.closest('[data-i]');
+  if (!b || b.disabled) return;
+  const i = Number(b.dataset.i);
+  Sim.play(false);
+  sel = sel === i ? null : i;
+  render(Sim.step(), e.currentTarget);
+  e.currentTarget.querySelector(`.${b.classList.contains('tn') ? 'tn' : 'ce'}[data-i="${i}"]`)?.focus();
+});
+
+// 직접 해 보기: 지금 힙(진행 중이던 동작이 끝난 상태)에서 이어지는 단계를 만들어 자동 재생
+function run(make) {
+  const cur = Sim.step(), m = cur.max ? MAX : MIN;
+  Sim.load(make(m, cur.end));
+  Sim.play(true);
+}
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = Number(e.target.v.value);
+  run((m, h) => !Number.isInteger(v) || v < 1 || v > 99
+    ? [step(m, h, '1부터 99까지 숫자만 넣을 수 있어요.', { err: '잘못된 값' })]
+    : h.length - 1 >= MAXN
+      ? [step(m, h, '이 화면은 노드를 10개까지만 보여 줘요. 하나 꺼낸 뒤 넣어 봐요.', { err: '가득 참' })]
+      : insertSteps(m, h, v));
+  e.target.reset();
+});
+document.getElementById('pop').addEventListener('click', () => run(deleteSteps));
+document.getElementById('again').addEventListener('click', () => { sel = null; Sim.reset(); });
+
+Sim.start({
+  modes: {
+    'Max Heap': modeSteps(MAX, [47, 31, 38, 12, 26, 9, 20], 41),
+    'Min Heap': modeSteps(MIN, [14, 22, 17, 40, 31, 25, 36], 9),
+  },
+  render,
+});
+</script>
+</body>
+</html>

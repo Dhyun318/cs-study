@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTTP 요청, 응답 메시지와 GET, POST</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 메시지 상자: 줄 이름 + 칸(chip)들 */
+.msg { display: grid; gap: 8px; padding: 12px; border: 1.5px solid var(--grey-200); border-radius: 14px; }
+.msg > b { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.mr { display: grid; gap: 4px; }
+.mr small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips.col { flex-direction: column; align-items: flex-start; }
+.ch { max-width: 100%; padding: 6px 10px; border: 1.5px solid var(--grey-100); border-radius: 8px; background: var(--grey-100); font-size: 14px; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+.ch.empty { border: 1.5px dashed var(--grey-200); background: none; font-weight: 500; color: var(--mute); }
+.ch.hl, .ch.on { border-color: var(--blue); background: var(--blue-50); }
+.note { min-height: 40px; margin-top: 10px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+
+/* 상태 코드 종류 줄 */
+.cls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.cls span { padding: 4px 8px; border-radius: 8px; background: var(--grey-100); font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.cls .hl { background: var(--blue-50); color: var(--accent-text); }
+
+/* 주소창: 부분마다 칸 */
+.bar { margin-bottom: 10px; padding: 10px 12px; border: 1.5px solid var(--grey-200); border-radius: 12px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.bar small { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.sg.hl { border-radius: 4px; background: var(--blue-50); color: var(--accent-text); }
+.pl { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; font-size: 14px; }
+.pl > span { padding: 6px 8px; border-radius: 8px; }
+.pl .k { font-weight: 700; color: var(--ink-2); }
+.pl .hl { background: var(--blue-50); }
+.pl .v { background: var(--grey-100); overflow-wrap: anywhere; }
+.pl .v small { display: block; font-size: 12px; font-weight: 500; color: var(--ink-2); }
+
+/* 원문 모양 요청 메시지 */
+.raw { padding: 10px 12px; border-radius: 12px; background: var(--grey-100); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.raw small { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.raw .hv { border-radius: 4px; background: var(--blue-50); color: var(--accent-text); font-weight: 700; }
+.raw i { font-style: normal; color: var(--mute); }
+
+/* GET과 POST 비교표 */
+.cmp { display: grid; grid-template-columns: 76px 1fr 1fr; gap: 4px; font-size: 14px; }
+.cmp span { padding: 8px; border-radius: 8px; background: var(--grey-100); }
+.cmp .h { background: none; font-weight: 700; color: var(--ink-2); }
+.cmp .hl { background: var(--blue-50); color: var(--accent-text); font-weight: 600; }
+
+/* 직접 해 보기 줄: 좁으면 접는다 */
+.sim-row { flex-wrap: wrap; }
+.sim-row input { min-width: 110px; }
+.sim-row select { flex: 1 1 auto; min-width: 88px; height: 48px; padding: 0 10px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 15px; }
+.sim-row select[name=path] { min-width: 140px; }
+.err { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--red); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>HTTP 메시지와 GET, POST</h1>
+  </header>
+  <a class="sim-q" data-q="05-network/4" data-mode="요청"><span><small>관련 질문</small><b>HTTP가 무엇인지</b></span></a>
+  <a class="sim-q" data-q="05-network/4" data-mode="응답"><span><small>관련 질문</small><b>HTTP가 무엇인지</b></span></a>
+  <a class="sim-q" data-q="05-network/5" data-mode="GET과 POST"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 2개">2</span>GET과 POST 차이</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="tryReq" data-mode="요청">
+    <h2>직접 해 보기</h2>
+    <p>요청할 경로와 언어를 고르면 요청 메시지를 처음부터 다시 조립해요.</p>
+    <div class="sim-row">
+      <select name="path" aria-label="요청 경로"><option>/menu/lunch</option><option>/menu/dessert</option><option>/notice</option></select>
+      <select name="lang" aria-label="받을 언어"><option>ko-KR</option><option>en-US</option></select>
+      <button class="sim-btn">조립</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+
+  <form class="sim-try" id="tryRes" data-mode="응답">
+    <h2>직접 해 보기</h2>
+    <p>상태 코드를 바꾸면 상태 줄과 종류가 어떻게 달라지는지 볼 수 있어요.</p>
+    <div class="sim-row">
+      <select name="code" aria-label="상태 코드"></select>
+      <button class="sim-btn">바꾸기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+
+  <form class="sim-try" id="tryGp" data-mode="GET과 POST" novalidate>
+    <h2>직접 해 보기</h2>
+    <p>검색어를 바꾸고 방식을 고르세요. GET은 주소에 붙고 POST는 바디로 가요.</p>
+    <div class="sim-row">
+      <input name="kw" maxlength="12" pattern="[A-Za-z0-9]{1,12}" required placeholder="예: mocha" aria-label="검색어(영문, 숫자)">
+      <select name="method" aria-label="전송 방식"><option>GET</option><option>POST</option></select>
+      <button class="sim-btn">보내기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="err" role="alert" hidden></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+const HOST = 'cafe.example.org';
+const DATE = 'Sat, 14 Nov 2026 03:00:00 GMT';
+const esc = t => String(t).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+
+// 상태 코드: [문구, 뜻, 종류 번호]. 코드 범위는 notes/04-network.md 표 안에서만
+const CODES = {
+  200: ['OK', '요청이 잘 처리됐어요.', 2],
+  201: ['Created', '새 자료가 만들어졌어요.', 2],
+  400: ['Bad Request', '요청 형식이 틀려서 이해할 수 없어요.', 4],
+  401: ['Unauthorized', '로그인 같은 인증이 안 된 요청이에요.', 4],
+  403: ['Forbidden', '누군지는 알지만 접근 권한이 없어요.', 4],
+  404: ['Not Found', '찾는 경로나 자료가 없어요.', 4],
+  500: ['Internal Server Error', '서버 안에서 처리하다 오류가 났어요.', 5],
+  503: ['Service Unavailable', '서버가 바빠서 지금은 응답하기 어려워요.', 5],
+};
+const CLASSES = { 1: '정보', 2: '성공', 3: '리다이렉션', 4: '클라이언트 오류', 5: '서버 오류' };
+
+// 메시지 종류별 줄 구성, 칸 이름, 눌렀을 때 설명
+const KIND = {
+  req: {
+    title: '요청 메시지 (클라이언트 → 서버)',
+    rows: [['시작 줄', ['method', 'path', 'proto']], ['헤더', ['host', 'lang']], ['바디', ['body']]],
+    lab: { method: 'Method', path: 'Path', proto: 'Protocol', host: 'Host', lang: 'Accept-Language', body: 'Body' },
+    help: {
+      method: 'Method: 서버에게 시킬 일이에요. GET은 자료를 달라는 뜻이에요.',
+      path: 'Path: 서버 안에서 원하는 자료의 위치예요.',
+      proto: 'Protocol: 이 메시지가 따르는 HTTP 버전이에요.',
+      host: 'Host: 요청을 받을 서버의 도메인 이름이에요.',
+      lang: 'Accept-Language: 응답을 어느 언어로 받고 싶은지 알려 줘요.',
+      body: 'Body: 실제로 실어 보내는 내용이에요. GET은 보통 비어 있어요.',
+    },
+  },
+  res: {
+    title: '응답 메시지 (서버 → 클라이언트)',
+    rows: [['상태 줄', ['proto', 'code', 'msg']], ['헤더', ['date', 'server']], ['바디', ['body']]],
+    lab: { proto: 'Protocol ver.', code: 'Status code', msg: 'Status message', date: 'Date', server: 'Server', body: 'Body' },
+    help: {
+      proto: 'Protocol ver.: 서버가 응답에 쓰는 HTTP 버전이에요.',
+      code: 'Status code: 처리 결과를 알리는 세 자리 숫자예요.',
+      msg: 'Status message: 상태 코드를 사람이 읽게 풀어 쓴 말이에요.',
+      date: 'Date: 서버가 이 응답을 만든 시각이에요.',
+      server: 'Server: 응답을 만든 서버 프로그램을 알려 줘요.',
+      body: 'Body: 클라이언트가 실제로 받는 내용이에요.',
+    },
+  },
+};
+const HEADERS = ['host', 'lang', 'date', 'server'];
+
+// 요청 단계: n = 지금까지 채운 칸 수
+function reqSteps(path = '/menu/lunch', lang = 'ko-KR') {
+  const vals = { method: 'GET', path, proto: 'HTTP/1.1', host: HOST, lang, body: '(비어 있음)' };
+  const s = (n, caption) => ({ kind: 'req', n, vals, caption });
+  return [
+    s(0, '클라이언트가 서버에 보낼 요청 메시지예요. 시작 줄, 헤더, 바디 순서로 써요.'),
+    s(1, '먼저 Method예요. 서버에게 시킬 일을 적어요. GET은 자료를 달라는 뜻이에요.'),
+    s(2, 'Path는 서버 안에서 원하는 자료의 위치예요.'),
+    s(3, 'Protocol은 쓰는 HTTP 버전이에요. 시작 줄은 여기서 끝나요.'),
+    s(4, '헤더는 이름: 값 모양이에요. Host에는 요청받을 서버 이름을 적어요.'),
+    s(5, 'Accept-Language에는 받고 싶은 언어를 적어요.'),
+    s(6, 'GET은 따로 보낼 내용이 없어서 바디가 비어요. 이제 서버로 보내요.'),
+  ];
+}
+
+// 응답 단계
+function resSteps() {
+  const vals = { proto: 'HTTP/1.1', code: 200, msg: 'OK', date: DATE, server: 'sample-server/2.1', body: '점심 메뉴 페이지(HTML)' };
+  const s = (n, caption, o) => ({ kind: 'res', n, vals, caption, ...o });
+  return [
+    s(0, '서버가 돌려줄 응답 메시지예요. 상태 줄, 헤더, 바디로 이뤄져요.'),
+    s(1, '먼저 서버가 쓰는 HTTP 버전을 적어요. 요청과 같은 버전이에요.'),
+    s(2, 'Status code는 결과를 알리는 세 자리 숫자예요. 코드 200은 성공이에요.'),
+    s(3, 'Status message는 코드를 말로 풀어 쓴 거예요. 여기서는 OK예요.'),
+    s(4, '헤더에는 Date를 넣어요. 서버가 응답을 만든 시각이에요.'),
+    s(5, 'Server 헤더에는 응답한 서버 프로그램 이름을 적어요.'),
+    s(6, '마지막은 바디예요. 사용자가 실제로 받을 메뉴 페이지가 들어가요.'),
+    s(6, '코드는 첫 자리로 종류가 나뉘어요. 아래 다섯 가지예요.', { cls: 2 }),
+  ];
+}
+
+// GET, POST 단계: q = 주소에 붙은 검색어, part = 강조할 주소 부분, rows = 보인 부분 수
+const gpStep = (caption, o) => ({ kind: 'gp', q: 'latte', rows: 0, caption, ...o });
+const GP = [
+  gpStep('주소창의 주소 하나에도 여러 부분이 들어 있어요. 하나씩 나눠 볼게요.'),
+  gpStep('scheme은 접속 방식이에요. https는 암호화한 HTTP로 접속한다는 뜻이에요.', { part: 'scheme', rows: 1 }),
+  gpStep('host는 접속할 서버의 이름이에요. DNS가 이 이름을 IP 주소로 바꿔요.', { part: 'host', rows: 2 }),
+  gpStep('path는 서버 안에서 찾는 자료의 위치예요.', { part: 'path', rows: 3 }),
+  gpStep('물음표부터가 query string이에요. 조회 조건을 이름=값으로 실어 보내요.', { part: 'query', rows: 4 }),
+  gpStep('GET은 검색어를 주소 끝 query에 붙여 보내요. 바디는 비어 있어요.', { part: 'query', msg: 'GET' }),
+  gpStep('POST로 바꾸면 검색어가 바디로 옮겨 가요. 주소에서는 사라져요.', { q: '', msg: 'POST' }),
+  gpStep('GET 값은 주소에 남고 POST 값은 바디에 담겨요.', { cmp: 2 }),
+  gpStep('다만 바디도 HTTPS가 아니면 평문이에요. POST가 더 안전한 건 아니에요.', { cmp: 4 }),
+];
+const CMP = [['', 'GET', 'POST'], ['값 위치', '주소 끝 query', '요청 바디'], ['주소창, 히스토리', '값이 남아요', '값이 안 남아요'], ['쓰임', '조회', '생성, 처리'], ['HTTPS 아니면', '평문', '평문']];
+
+// 칸 하나: 채워졌으면 누를 수 있는 버튼, 아니면 점선 자리
+function chip(K, s, id, idx) {
+  const lab = K.lab[id], val = esc(s.vals[id]);
+  if (idx >= s.n) return `<span class="ch empty">${lab}</span>`;
+  const text = HEADERS.includes(id) ? `${lab}: ${val}` : val;
+  return `<button type="button" class="ch num${idx === s.n - 1 ? ' hl sim-pop' : ''}" data-f="${id}">${text}</button>`;
+}
+
+function msgHtml(s) {
+  const K = KIND[s.kind];
+  let idx = 0;
+  const rows = K.rows.map(([name, ids]) => `
+    <div class="mr"><small>${name}</small><div class="chips${name === '헤더' ? ' col' : ''}">${ids.map(id => chip(K, s, id, idx++)).join('')}</div></div>`).join('');
+  const cls = s.cls ? `<div class="cls">${Object.entries(CLASSES).map(([n, t]) => `<span class="num${+n === s.cls ? ' hl' : ''}">${n}xx ${t}</span>`).join('')}</div>` : '';
+  return `<div class="msg"><b>${K.title}</b>${rows}</div>${cls}<p class="note">${s.n ? '칸을 누르면 뜻이 나와요.' : ''}</p>`;
+}
+
+const PARTS = q => [['scheme', 'https', '접속 방식'], ['host', HOST, '서버 이름'], ['path', '/menu/find', '서버 안의 위치'], ['query', q ? `kw=${q}` : '(없음)', '조건(이름=값)']];
+
+function gpHtml(s) {
+  if (s.cmp !== undefined) {
+    return `<div class="cmp">${CMP.map((r, i) => r.map((c, j) => `<span class="${i === 0 ? 'h' : j && i === s.cmp ? 'hl' : ''}">${c}</span>`).join('')).join('')}</div>`;
+  }
+  const q = esc(s.q), seg = (k, t) => `<span class="sg${s.part === k ? ' hl' : ''}">${t}</span>`;
+  const bar = `<div class="bar num"><small>주소창</small>${seg('scheme', 'https://')}${seg('host', HOST)}${seg('path', '/menu/find')}${seg('query', q ? `?kw=${q}` : '')}</div>`;
+  if (s.msg) {
+    const get = s.msg === 'GET';
+    const lines = get
+      ? [`GET /menu/find<b class="hv">${q ? `?kw=${q}` : ''}</b> HTTP/1.1`, `Host: ${HOST}`, '', '<i>(바디 비어 있음)</i>']
+      : ['POST /menu/find HTTP/1.1', `Host: ${HOST}`, 'Content-Type: application/x-www-form-urlencoded', `Content-Length: ${`kw=${s.kw || 'latte'}`.length}`, '', `<b class="hv">kw=${esc(s.kw || 'latte')}</b>`];
+    return `${bar}<div class="raw num"><small>요청 메시지 (${s.msg})</small>${lines.map(l => `<div>${l || '&nbsp;'}</div>`).join('')}</div>`;
+  }
+  return `${bar}<div class="pl num">${PARTS(q).slice(0, s.rows).map(([k, v, d]) =>
+    `<span class="k${s.part === k ? ' hl' : ''}">${k}</span><span class="v${s.part === k ? ' hl' : ''}">${v}<small>${d}</small></span>`).join('')}</div>`;
+}
+
+function render(s, stage) {
+  stage.innerHTML = s.kind === 'gp' ? gpHtml(s) : msgHtml(s);
+}
+
+// 칸을 누르면 뜻을 보여 주고 그 칸만 강조
+document.getElementById('sim-stage').addEventListener('click', e => {
+  const b = e.target.closest('[data-f]');
+  if (!b) return;
+  const stage = e.currentTarget;
+  stage.querySelectorAll('.ch').forEach(c => c.classList.remove('hl', 'on'));
+  b.classList.add('on');
+  stage.querySelector('.note').textContent = KIND[Sim.step().kind].help[b.dataset.f];
+});
+
+// 직접 해 보기 1: 경로와 언어를 골라 요청 다시 조립
+document.getElementById('tryReq').addEventListener('submit', e => {
+  e.preventDefault();
+  const { path, lang } = e.target;
+  Sim.load(reqSteps(path.value, lang.value));
+  Sim.play(true);
+});
+
+// 직접 해 보기 2: 상태 코드를 바꿔 상태 줄 보기
+const codeSel = document.querySelector('#tryRes select');
+codeSel.innerHTML = Object.keys(CODES).map(c => `<option>${c}</option>`).join('');
+document.getElementById('tryRes').addEventListener('submit', e => {
+  e.preventDefault();
+  const code = e.target.code.value in CODES ? e.target.code.value : 200;
+  const [msg, meaning, cls] = CODES[code];
+  const vals = { ...resSteps()[0].vals, code, msg, body: cls === 2 ? '요청한 내용' : '오류 안내 문구' };
+  Sim.load([
+    { kind: 'res', n: 3, vals, caption: `상태 줄을 바꿨어요. 코드: ${code}, 문구: ${msg}.` },
+    { kind: 'res', n: 6, vals, cls, caption: `${meaning} 종류: ${CLASSES[cls]}.` },
+  ]);
+  Sim.play(true);
+});
+
+// 직접 해 보기 3: 검색어와 방식. GET은 주소에, POST는 바디에 값이 실린다
+const gpForm = document.getElementById('tryGp');
+gpForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const kw = e.target.kw.value, err = gpForm.querySelector('.err');
+  if (!/^[A-Za-z0-9]{1,12}$/.test(kw)) {
+    err.textContent = '영문과 숫자만 12자까지 넣을 수 있어요.';
+    err.hidden = false;
+    return;
+  }
+  err.hidden = true;
+  const get = e.target.method.value !== 'POST';
+  Sim.load(get ? [
+    gpStep('검색어를 바꿨어요. 주소 끝 query가 같이 바뀌었어요.', { q: kw, part: 'query', rows: 4 }),
+    gpStep('요청 시작 줄에도 같은 주소가 실려요. 바디는 비어 있어요.', { q: kw, part: 'query', msg: 'GET' }),
+  ] : [
+    gpStep('GET이라면 검색어가 이렇게 주소에 붙어요.', { q: kw, part: 'query', rows: 4 }),
+    gpStep('POST로 보내면 검색어가 바디로 가요. 주소에는 안 남아요.', { q: '', kw, msg: 'POST' }),
+  ]);
+  Sim.play(true);
+});
+
+Sim.start({ modes: { 요청: reqSteps(), 응답: resSteps(), 'GET과 POST': GP }, render });
+</script>
+</body>
+</html>

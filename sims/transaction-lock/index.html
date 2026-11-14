@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transaction 동시 접근과 Lock</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 공유 데이터 상자: 현재 값 + Lock 상태 */
+.db { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; padding: 10px 12px; border: 1.5px solid var(--grey-200); border-radius: 14px; }
+.db small { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.db b { font-size: 20px; font-weight: 700; }
+.db.bad { border-color: var(--red); background: var(--red-50); }
+.db.bad b { color: var(--red); }
+.lk { padding: 4px 10px; border-radius: 8px; background: var(--grey-100); font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.lk.held { background: var(--blue-50); color: var(--accent-text); }
+
+/* 시간표: 왼쪽 시간 순서, 가운데 트랜잭션 1, 오른쪽 트랜잭션 2 */
+.tl { display: grid; grid-template-columns: 26px 1fr 1fr; gap: 6px; align-items: stretch; margin-top: 10px; }
+.th { font-size: 12px; font-weight: 700; color: var(--ink-2); text-align: center; }
+.th small { display: block; font-size: 12px; font-weight: 600; }
+.tm { display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+
+/* 칸: 한 번의 동작. 아직 안 온 칸은 점선 */
+.ce { display: grid; align-content: center; min-height: 40px; padding: 4px 8px; border: 1.5px solid transparent; border-radius: 10px; }
+.ce b { font-size: 14px; line-height: 1.25; }
+.ce small { font-size: 12px; line-height: 1.3; color: var(--ink-2); }
+.ce.t1 { background: var(--blue-50); }
+.ce.t2 { background: var(--grey-100); }
+.ce.fut { background: none; border: 1.5px dashed var(--grey-200); color: var(--ink-2); }
+.ce.wait { background: var(--bg); border: 1.5px dashed var(--chev); color: var(--ink-2); }
+.ce.now { border: 1.5px solid var(--accent-text); }
+.ce.bad { background: var(--red-50); border: 1.5px solid var(--red); }
+.ce.bad small, .ce.bad b { color: var(--red); }
+
+/* 결과 비교: Lock 없음 / Lock 있음 */
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.cmp div { display: grid; gap: 1px; padding: 8px 10px; border: 1.5px solid var(--grey-200); border-radius: 12px; }
+.cmp.off { visibility: hidden; }
+.cmp small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.cmp b { font-size: 17px; font-weight: 700; }
+.cmp em { font-size: 12px; font-style: normal; font-weight: 600; color: var(--ink-2); }
+.cmp .bad { border-color: var(--red); background: var(--red-50); }
+.cmp .bad b, .cmp .bad em { color: var(--red); }
+.cmp .ok { border-color: var(--blue); background: var(--blue-50); }
+
+/* 직접 해 보기: 입력 두 개 */
+.sim-row label { flex: 1; min-width: 0; display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.sim-row label input { width: 100%; }
+.err { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--red); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Transaction 동시 접근과 Lock</h1>
+  </header>
+  <a class="sim-q" data-q="04-database/5"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 2개">2</span>동시 갱신과 Lock</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try" novalidate>
+    <h2>직접 해 보기</h2>
+    <p>두 트랜잭션이 잔액 500원에 더할 값을 넣으면, 보고 있는 모드로 다시 계산해요. 맨 아래에 두 모드의 결과를 나란히 보여 줘요.</p>
+    <div class="sim-row">
+      <label>첫째가 더할 값<input name="a" inputmode="numeric" maxlength="3" required placeholder="예: 70"></label>
+      <label>둘째가 더할 값<input name="b" inputmode="numeric" maxlength="3" required placeholder="예: 30"></label>
+    </div>
+    <div class="sim-row">
+      <button class="sim-btn">계산하기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="err" id="err" role="alert" hidden></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시: 공유 잔액 A = 500원. 두 트랜잭션이 각각 a원, b원을 더한다
+const BASE = 500;
+
+// 시간표 한 줄 = [트랜잭션 1 칸, 트랜잭션 2 칸]. 칸 = { m: 동작, s: 작은 설명, k: 종류 }
+const noLockRows = (a, b) => [
+  [{ m: 'Read(A)', s: `읽은 값 ${BASE}` }, null],
+  [null, { m: 'Read(A)', s: `읽은 값 ${BASE}` }],
+  [{ m: 'Write(A)', s: `${BASE} + ${a} = ${BASE + a}` }, null],
+  [null, { m: 'Write(A)', s: `${BASE} + ${b} = ${BASE + b}`, k: 'bad' }],
+];
+const lockRows = (a, b) => [
+  [{ m: 'Lock(A)', s: 'Lock 획득' }, null],
+  [null, { m: 'Lock(A)', s: '잠겨 있어요', k: 'wait' }],
+  [{ m: 'Read(A)', s: `읽은 값 ${BASE}` }, { m: 'wait...', s: '기다리는 중', k: 'wait' }],
+  [{ m: 'Write + Unlock', s: `${BASE} + ${a} = ${BASE + a}` }, { m: 'wait...', s: '기다리는 중', k: 'wait' }],
+  [null, { m: 'Lock + Read', s: `읽은 값 ${BASE + a}` }],
+  [null, { m: 'Write + Unlock', s: `${BASE + a} + ${b} = ${BASE + a + b}` }],
+];
+
+// 단계 목록 만들기. upto = 시간표에서 여기까지 진행, db = 잔액, lk = Lock 보유자(null: Lock 안 씀, '': 비어 있음)
+function build(lock, a, b) {
+  const rows = lock ? lockRows(a, b) : noLockRows(a, b);
+  const S = (caption, upto, db, o = {}) => ({ caption, lock, a, b, rows, upto, db, lk: lock ? '' : null, ...o });
+  const lost = BASE + b, both = BASE + a + b;
+  return lock ? [
+    S('이번에는 잔액에 Lock을 써요. Lock을 쥔 트랜잭션만 잔액을 만질 수 있어요.', 0, BASE),
+    S('첫째가 먼저 잔액에 Lock을 걸었어요.', 1, BASE, { lk: '1' }),
+    S('둘째도 Lock을 요청했지만 이미 잠겨 있어서 wait 상태가 돼요.', 2, BASE, { lk: '1' }),
+    S('첫째가 잔액을 읽었어요. 둘째는 계속 기다려요.', 3, BASE, { lk: '1' }),
+    S(`첫째가 ${BASE + a}원을 쓰고 Lock을 풀었어요.`, 4, BASE + a, { dbNew: true }),
+    S(`이제 둘째가 Lock을 얻어 읽어요. 첫째 결과인 ${BASE + a}원이 보여요.`, 5, BASE + a, { lk: '2' }),
+    S(`둘째가 ${b}원을 더해 ${both}원을 쓰고 Lock을 풀었어요.`, 6, both, { dbNew: true }),
+    S(`잔액이 ${both}원이 됐어요. 입금 두 번이 모두 반영됐어요.`, 6, both, { res: true }),
+  ] : [
+    S(`잔액 ${BASE}원에 두 트랜잭션이 동시에 입금해요. 첫째는 ${a}원, 둘째는 ${b}원이에요.`, 0, BASE),
+    S(`첫째가 잔액을 읽었어요. ${BASE}원이 보여요.`, 1, BASE),
+    S(`둘째도 잔액을 읽었어요. 첫째가 쓰기 전이라 같은 ${BASE}원이에요.`, 2, BASE),
+    S(`첫째가 ${BASE}원에 ${a}원을 더해 ${BASE + a}원을 썼어요.`, 3, BASE + a, { dbNew: true }),
+    S(`둘째는 자기가 읽은 ${BASE}원에 더해 ${lost}원을 써요. 첫째 결과를 덮어써요.`, 4, lost, { dbNew: true, bad: true }),
+    S(`잔액이 ${lost}원이 됐어요. 첫째의 ${a}원이 사라졌어요. 이게 lost update예요.`, 4, lost, { res: true, bad: true }),
+  ];
+}
+
+// 그리기: 잔액 상자 + 시간표 (+ 마지막 단계에서 두 모드 결과 비교)
+function render(s, stage) {
+  const cell = (c, col, i) => {
+    if (!c) return '<span></span>';
+    const shown = i < s.upto, now = i === s.upto - 1;
+    const cls = !shown ? 'fut' : `t${col}${c.k ? ' ' + c.k : ''}${now ? ' now sim-pop' : ''}`;
+    return `<span class="ce ${cls}"><b>${c.m}</b><small>${c.s}</small></span>`;
+  };
+  const lk = s.lk === null ? '<span class="lk">Lock 안 씀</span>'
+    : s.lk ? `<span class="lk held">Lock 보유: 트랜잭션 ${s.lk}</span>` : '<span class="lk">Lock 비어 있음</span>';
+  // 마지막 단계 아래 칸은 항상 자리를 잡아 두어 버튼이 움직이지 않게 한다
+  const cmp = `
+    <div class="cmp${s.res ? '' : ' off'}"${s.res ? '' : ' aria-hidden="true"'}>
+      <div class="bad"><small>Lock 없음</small><b class="num">${BASE + s.b}원</b><em>${s.a}원 사라짐</em></div>
+      <div class="ok"><small>Lock 있음</small><b class="num">${BASE + s.a + s.b}원</b><em>모두 반영</em></div>
+    </div>`;
+  stage.innerHTML = `
+    <div class="db${s.bad && s.res ? ' bad' : ''}"><div><small>공유 데이터 A (잔액)</small><b class="num${s.dbNew ? ' sim-pop' : ''}">${s.db}원</b></div>${lk}</div>
+    <div class="tl">
+      <span class="th">시간</span>
+      <span class="th">트랜잭션 1<small>+${s.a}원</small></span>
+      <span class="th">트랜잭션 2<small>+${s.b}원</small></span>
+      ${s.rows.map((r, i) => `<span class="tm num">${i + 1}</span>${cell(r[0], 1, i)}${cell(r[1], 2, i)}`).join('')}
+    </div>${cmp}`;
+}
+
+// 직접 해 보기: 두 값(1~999)을 받아 지금 보는 모드로 다시 계산한다
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const err = document.getElementById('err'), [a, b] = [e.target.a.value.trim(), e.target.b.value.trim()];
+  const ok = v => /^\d{1,3}$/.test(v) && Number(v) >= 1;
+  err.hidden = ok(a) && ok(b);
+  if (err.hidden === false) { err.textContent = '두 칸 모두 1부터 999 사이의 숫자를 넣어 주세요.'; return; }
+  Sim.load(build(Sim.step().lock, Number(a), Number(b)));
+  Sim.play(true);
+  e.target.reset();
+});
+
+Sim.start({ modes: { 'Lock 없음': build(false, 70, 30), 'Lock 있음': build(true, 70, 30) }, render });
+</script>
+</body>
+</html>

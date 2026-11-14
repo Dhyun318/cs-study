@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semaphore wait와 signal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위쪽: S 값(크게) + 지금 하는 일 */
+.top { display: grid; grid-template-columns: 112px 1fr; gap: 8px; }
+.sv { display: grid; gap: 2px; padding: 10px 8px; border: 1.5px solid var(--grey-200); border-radius: 14px; text-align: center; }
+.sv.zero { border-color: var(--blue); background: var(--blue-50); }
+.sv small, .op small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.sv b { font-size: 44px; font-weight: 800; line-height: 1.1; color: var(--accent-text); }
+.sv span { font-size: 12px; font-weight: 600; color: var(--grey-800); }
+.op { display: grid; align-content: center; gap: 2px; min-width: 0; padding: 10px 12px; border: 1.5px dashed var(--grey-200); border-radius: 14px; }
+.op b { font-size: 15px; font-weight: 700; }
+.op span { min-height: 22px; font-size: 15px; font-weight: 700; color: var(--accent-text); }
+
+/* 자리와 대기 줄 */
+.lb { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.slots { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 6px; }
+.slot, .chip { display: grid; place-items: center; border-radius: 10px; font-size: 14px; font-weight: 700; }
+.slot { height: 52px; border: 1px dashed var(--grey-200); color: var(--ink-2); font-weight: 600; }
+.slot.on, .chip { background: var(--grey-100); color: var(--grey-900); border: 1px solid var(--grey-100); }
+.hl { background: var(--blue-50) !important; border: 1px solid var(--blue) !important; }
+.queue { display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; align-items: center; }
+.chip { padding: 0 12px; height: 40px; }
+.none { font-size: 14px; color: var(--ink-2); }
+
+/* 직접 해 보기 선택 칸 */
+.pick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.pick label { flex: 1 1 130px; display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.pick select { height: 48px; padding: 0 12px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.err { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--red); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Semaphore wait와 signal</h1>
+  </header>
+  <a class="sim-q" data-q="03-os/6"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>동기화 문제 해결</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>자원 수(S 시작값)와 thread 수를 고르면 thread가 차례로 wait를 불러요. 몇 번째부터 대기가 생기는지 보세요. 시작값이 하나뿐이면 binary semaphore예요.</p>
+    <div class="pick">
+      <label>자원 수 (S 시작값)
+        <select name="n" aria-label="자원 수"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+      </label>
+      <label>thread 수
+        <select name="t" aria-label="thread 수"><option>2</option><option>3</option><option selected>4</option><option>5</option></select>
+      </label>
+    </div>
+    <div class="sim-row">
+      <button class="sim-btn">시작</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="err" id="err" role="alert" hidden>자원 수는 1~4, thread 수는 2~5 중에서 골라 주세요.</p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시: DB 커넥션 풀. 자리 = 자원 1개, S = 비어 있는 자리 수. thread 이름은 알파벳 A, B, C...
+// 사건 [종류, thread, 직접 쓴 설명(선택)]을 차례로 적용해 단계 배열을 만든다
+function build(N, events, first) {
+  const slots = Array(N).fill(null), queue = [], out = [];
+  const free = () => slots.filter(x => !x).length;
+  const snap = (caption, text, change, hl) => out.push({ caption, N, S: free(), slots: [...slots], queue: [...queue], text, change, hl });
+  snap(first, '시작 전', `S: ${N}`);
+  for (const [kind, t, say] of events) {
+    const before = free();
+    if (kind === 'wait' && before > 0) {
+      slots[slots.indexOf(null)] = t;
+      snap(say || `thread ${t}가 wait(S)를 불렀어요. S가 남아 있어서 하나 줄이고 들어가요.`, `thread ${t}: wait(S)`, `S: ${before} → ${free()}`, t);
+    } else if (kind === 'wait') {
+      queue.push(t);
+      snap(say || `thread ${t}가 wait(S)를 불렀는데 남은 자원이 없어요. 들어가지 못하고 대기 줄에 서요.`, `thread ${t}: wait(S)`, 'S: 0 유지', t);
+    } else {
+      slots[slots.indexOf(t)] = null;
+      const q = queue[0];
+      snap(say || (q ? `thread ${t}가 signal(S)로 자원을 돌려줘요. S가 하나 늘고, 기다리던 thread ${q}를 깨워요.` : `thread ${t}가 signal(S)로 자원을 돌려줘요. 기다리는 thread가 없어서 S만 하나 늘어요.`),
+        `thread ${t}: signal(S)`, `S: ${before} → ${free()}`, q);
+      if (q) {
+        queue.shift();
+        slots[slots.indexOf(null)] = q;
+        snap(`깨어난 thread ${q}가 wait(S)를 마저 끝내요. S를 하나 줄이고 들어가요.`, `thread ${q}: wait 마저 통과`, `S: ${before + 1} → ${free()}`, q);
+      }
+    }
+  }
+  return out;
+}
+
+const COUNT = build(3, [['wait', 'A'], ['wait', 'B'], ['wait', 'C'], ['wait', 'D'], ['signal', 'B'], ['signal', 'A'], ['signal', 'C'],
+  ['signal', 'D', 'thread D까지 돌려줬어요. S가 처음 값으로 돌아왔어요.']],
+  'DB 연결이 3개 있는 풀이에요. S는 남은 연결 수예요. 시작값은 3.');
+
+const BINARY = build(1, [['wait', 'A'], ['wait', 'B'], ['wait', 'C'], ['signal', 'A'], ['signal', 'B'], ['signal', 'C']],
+  '연결이 1개뿐인 풀이에요. S가 0, 1 두 값만 가지는 binary semaphore예요.');
+// binary는 mutex와 소유권이 다르다는 점을 마지막에 짚는다
+BINARY.push({ ...BINARY.at(-1), caption: 'mutex는 lock 건 쪽만 풀어요. semaphore는 소유자가 없어 다른 thread도 signal해요.', text: 'mutex와 비교', change: '' });
+
+// 그리기: S 값, 지금 하는 일, 자리, 대기 줄 (넣는 값은 모두 위에서 만든 숫자와 알파벳)
+function render(s, stage) {
+  const slot = (t, i) => t ? `<span class="slot on${t === s.hl ? ' hl sim-pop' : ''}">thread ${t}</span>` : '<span class="slot">빈 자리</span>';
+  stage.innerHTML = `
+    <div class="top">
+      <div class="sv${s.S === 0 ? ' zero' : ''}"><small>S 값</small><b class="num">${s.S}</b><span class="num">${s.S === 0 ? '자원 없음' : `자원 ${s.S}개 남음`}</span></div>
+      <div class="op"><small>지금 하는 일</small><b>${s.text}</b><span class="num">${s.change}</span></div>
+    </div>
+    <p class="lb">자원 사용 중 (자리 ${s.N}개)</p>
+    <div class="slots" style="--n:${s.N}">${s.slots.map(slot).join('')}</div>
+    <p class="lb">대기 줄</p>
+    <div class="queue">${s.queue.map(t => `<span class="chip${t === s.hl ? ' hl sim-pop' : ''}">thread ${t}</span>`).join('') || '<span class="none">기다리는 thread 없음</span>'}</div>`;
+}
+
+// 직접 해 보기: 고른 자원 수와 thread 수로 wait가 차례로 이어지는 단계를 만든다
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const N = Number(e.target.n.value), T = Number(e.target.t.value);
+  const ok = Number.isInteger(N) && Number.isInteger(T) && N >= 1 && N <= 4 && T >= 2 && T <= 5;
+  document.getElementById('err').hidden = ok;
+  if (!ok) return;
+  const names = 'ABCDE'.slice(0, T).split('');
+  const events = names.map((t, i) => ['wait', t, i === N ? `thread ${t}가 wait(S)를 불렀는데 남은 자원이 없어요. ${N + 1}번째 요청부터 대기가 생겨요.` : undefined]);
+  if (T <= N) events.at(-1)[2] = '대기 없이 모두 들어갔어요. thread 수가 자원 수 이하면 대기가 생기지 않아요.';
+  else events.push(['signal', 'A']); // 먼저 들어간 thread가 반납하면 기다리던 thread가 깨어난다
+  Sim.load(build(N, events, N === 1 ? 'S 시작값은 1. 한 번에 하나만 들어가는 binary semaphore예요.' : `S 시작값은 ${N}. 자원이 ${N}개라서 최대 ${N}개 thread가 동시에 들어가요.`));
+  Sim.play(true);
+});
+
+Sim.start({ modes: { '카운팅 (S=3)': COUNT, 'binary (S=1)': BINARY }, render });
+</script>
+</body>
+</html>

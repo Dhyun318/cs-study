@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hash table 저장과 충돌</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* hash function 상자: 식 + 이번 계산 */
+.fn { display: grid; gap: 2px; padding: 10px 14px; border: 1.5px dashed var(--grey-200); border-radius: 14px; text-align: center; }
+.fn small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.fn b { font-size: 17px; font-weight: 700; }
+.fn span { min-height: 22px; font-size: 15px; font-weight: 700; color: var(--accent-text); }
+
+/* 표: 왼쪽 index, 오른쪽 칸(slot) */
+.ht { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; margin-top: 12px; }
+.th { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.ix { text-align: right; font-size: 14px; font-weight: 700; }
+.gap { text-align: center; line-height: 1; color: var(--mute); }
+/* 칸: 노드들을 화살표로 잇는다. 줄이 넘치면 다음 줄로 접는다 */
+.sl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; min-width: 0; min-height: 34px; padding: 3px 4px; border: 1px solid var(--grey-200); border-radius: 8px; font-size: 13px; }
+.sl.hl { border-color: var(--blue); background: var(--blue-50); }
+.sl.bad { border-color: var(--red); background: var(--red-50); }
+.sl em { margin: 0 4px 0 auto; padding-left: 6px; font-size: 12px; font-style: normal; font-weight: 700; color: var(--red); }
+.nil { flex: 1; text-align: center; color: var(--mute); }
+.ar { width: 12px; text-align: center; font-weight: 700; color: var(--accent-text); }
+
+/* 노드: key와 value 한 덩어리 */
+.nd { display: inline-flex; gap: 5px; padding: 3px 5px; border-radius: 6px; background: var(--grey-100); white-space: nowrap; }
+.nd i { font-style: normal; }
+.nd i + i { font-weight: 700; }
+.hl .nd, .bad .nd { background: var(--bg); }
+.ht:not(.hash) .nd { flex: 1; justify-content: center; background: none; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Hash table 저장과 충돌</h1>
+  </header>
+  <a class="sim-q" data-q="02-data-structure/11" data-mode="저장"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 2개">2</span>Hash table 개념</b></span></a>
+  <a class="sim-q" data-q="02-data-structure/12" data-mode="충돌"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 4개">4</span>Hash 충돌과 해결 방법</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>상품 코드(숫자)를 넣으면 7로 나눈 나머지 칸에 들어가요. 이미 찬 칸이면 충돌이 나요. 예: 300126은 1번 칸.</p>
+    <div class="sim-row">
+      <input name="key" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" required placeholder="예: 300126" aria-label="넣을 key(숫자)">
+      <button class="sim-btn">넣기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 데이터: key = 상품 코드, value = 상품 이름. h(k) = k mod 7
+const M = 7;
+const NAME = { 300109: '사과', 300112: '우유', 300135: '식빵', 300119: '달걀' };
+const BASE = [300109, 300112, 300135];
+const CALC = k => `h(${k}) = ${k} mod 7 = ${k % M}`;
+
+// 빈 표(칸 7개, 칸마다 list)와 key 목록을 차례로 넣은 표
+const empty = () => Array.from({ length: M }, () => []);
+const filled = keys => { const t = empty(); keys.forEach(k => t[k % M].push({ k, v: NAME[k] })); return t; };
+
+// hash table 단계: at = 강조할 칸, add = 그 칸 마지막 노드가 방금 들어옴, tag = 빨간 꼬리표
+function hashStep(table, caption, { at, calc, add, tag, f = 'h(k) = k mod 7' } = {}) {
+  return {
+    caption, table, hash: true,
+    fn: ['hash function', f, calc],
+    head: table.some(list => list.length > 1) ? 'key, value (같은 칸은 linked list)' : 'key, value',
+    rows: table.map((list, i) => ({ i, list, hl: i === at && !tag, add: i === at && add, tag: i === at ? tag : '' })),
+  };
+}
+
+// 직접 주소화 단계: [index, value] 목록을 그대로 표로
+const direct = (rows, caption, calc) => ({
+  caption, fn: ['Direct-address', 'index = key', calc], head: 'value',
+  rows: rows.map(([i, v]) => ({ i, list: v ? [{ v }] : [], hl: !!v })),
+});
+
+// 문자열 key 예시: h′(k) = 글자 코드의 합
+const strTable = empty();
+[['apple', '사과', 530], ['milk', '우유', 429], ['jam', '잼', 312]].forEach(([k, v, n]) => strTable[n % M].push({ k, v }));
+
+const SAVE = [
+  direct([[0], [1, '사과'], [2], [3], [4, '우유'], [5], [6, '식빵']],
+    '직접 주소화(Direct-address)는 key 값을 그대로 칸 번호로 써요. 상품 번호 4인 우유는 4번 칸에 들어가요.', 'key 4 → 4번 칸'),
+  direct([[0], ['⋮'], [300109, '사과'], ['⋮'], [300112, '우유'], ['⋮'], [300135, '식빵']],
+    'key가 300135처럼 크면 300135번 칸까지 배열을 잡아야 해요. 상품은 3개인데 칸은 거의 다 비어 있어요.', '칸 300,136개 중 3개만 사용'),
+  direct([[0], [1], [2], [3], [4], [5], [6]],
+    'key가 apple 같은 문자열이면 몇 번 칸에 넣을지 정할 수 없어요. 칸 번호는 정수여야 하니까요.', 'apple → ?번 칸'),
+  hashStep(empty(), 'hash table은 key를 hash function에 넣어 나온 값을 칸 번호로 써요. 이 칸 하나를 slot(또는 bucket)이라고 불러요.'),
+  hashStep(filled([300109]), '300109를 7로 나눈 나머지는 5예요. 그래서 (300109, 사과)는 5번 칸에 들어가요.', { at: 5, add: true, calc: CALC(300109) }),
+  hashStep(filled([300109, 300112]), '300112는 나머지가 1이라 (300112, 우유)는 1번 칸이에요.', { at: 1, add: true, calc: CALC(300112) }),
+  hashStep(filled(BASE), '(300135, 식빵)은 3번 칸. key가 아무리 커도 칸은 0번부터 6번까지 7개면 돼요.', { at: 3, add: true, calc: CALC(300135) }),
+  { ...hashStep(strTable, '문자열 key는 먼저 h′로 정수를 만든 뒤 나머지를 구해요. 여기서는 글자 코드를 더해서 milk는 429, 2번 칸이에요.',
+      { at: 2, add: true, f: 'h(k) = h′(k) mod 7', calc: 'h(milk) = 429 mod 7 = 2' }), table: null },
+];
+
+const ADD = [...BASE, 300119];
+const CRASH = [
+  hashStep(filled(BASE), '상품 3개가 h(k) = k mod 7로 들어 있는 표예요. 여기에 (300119, 달걀)을 넣어 볼게요.'),
+  hashStep(filled(BASE), '300119를 7로 나눈 나머지는 1이에요. 1번 칸으로 가야 해요.', { at: 1, calc: CALC(300119) }),
+  hashStep(filled(BASE), '1번 칸은 이미 300112가 쓰고 있어요. key는 다른데 칸 번호가 같아진 이 상황이 collision이에요.', { at: 1, tag: 'collision', calc: CALC(300119) }),
+  hashStep(filled(ADD), 'separate chaining은 칸마다 linked list를 두고, 같은 칸에 온 데이터를 노드로 이어 붙여요.', { at: 1, add: true, calc: CALC(300119) }),
+  hashStep(filled(ADD), '넣을 때는 O(1)이에요. 하지만 key가 한 칸에 몰릴수록 list가 길어져서, 찾을 때 최악 O(n)까지 걸려요.', { at: 1 }),
+];
+
+// 그리기: hash function 상자 + index/칸 표
+function render(s, stage) {
+  stage.innerHTML = `
+    <div class="fn"><small>${s.fn[0]}</small><b>${s.fn[1]}</b><span class="num">${s.fn[2] || ''}</span></div>
+    <div class="ht${s.hash ? ' hash' : ''}">
+      <span class="th">index</span><span class="th">${s.head}</span>
+      ${s.rows.map(r => r.i === '⋮' ? '<span class="ix">⋮</span><span class="gap">⋮</span>' : `
+        <span class="ix num">${r.i}</span>
+        <span class="sl num${r.hl ? ' hl' : ''}${r.tag ? ' bad' : ''}">${slot(r)}${r.tag ? `<em>${r.tag}</em>` : ''}</span>`).join('')}
+    </div>`;
+}
+
+// 칸 하나: 비면 /, 아니면 노드 → 노드 (방금 들어온 노드는 살짝 튀어나온다)
+function slot(r) {
+  const nodes = r.list.map((n, j) => `<span class="nd${r.add && j === r.list.length - 1 ? ' sim-pop' : ''}">${n.k === undefined ? '' : `<i>${n.k}</i>`}<i>${n.v}</i></span>`);
+  return nodes.join('<b class="ar">→</b>') || '<span class="nil">/</span>';
+}
+
+// 직접 해 보기: 지금 보이는 표에 key를 넣는 단계를 만들어 자동 재생
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const k = Number(e.target.key.value), at = k % M, calc = CALC(k);
+  const before = structuredClone(Sim.step().table || filled(BASE));
+  const after = structuredClone(before);
+  after[at].push({ k, v: NAME[k] || '-' });
+  const used = before[at].length;
+  Sim.load(before.flat().some(n => n.k === k)
+    ? [hashStep(before, '이미 들어 있는 key예요. hash table에서 key는 겹칠 수 없어요.', { at, calc, tag: '같은 key' })]
+    : [
+      hashStep(before, `계산해 보니 ${at}번 칸이에요.`, { at, calc }),
+      ...(used ? [hashStep(before, `${at}번 칸에 이미 다른 key가 있어요. collision이에요.`, { at, calc, tag: 'collision' })] : []),
+      hashStep(after, used ? `${at}번 칸의 list 끝에 노드로 이어 붙였어요. 이 칸에는 이제 노드 ${used + 1}개가 있어요.` : `${at}번 칸이 비어 있어서 바로 넣었어요.`, { at, calc, add: true }),
+    ]);
+  Sim.play(true);
+  e.target.reset();
+});
+
+Sim.start({ modes: { 저장: SAVE, 충돌: CRASH }, render });
+</script>
+</body>
+</html>

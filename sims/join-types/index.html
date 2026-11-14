@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inner join과 left join 결과</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 표 이름 줄 */
+.vl { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+
+/* 벤 다이어그램: SVG 원 위에 행 꼬리표를 영역별 열로 얹는다 */
+.venn { position: relative; aspect-ratio: 342 / 210; }
+.venn svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.vc { fill: var(--grey-100); stroke: var(--grey-200); stroke-width: 1.5; transition: fill .2s; }
+.lens { fill: var(--bg); stroke: var(--grey-200); stroke-width: 1.5; transition: fill .2s; }
+.vc.on, .lens.on { fill: var(--blue-50); stroke: var(--blue); }
+.vcol { position: absolute; top: 8%; bottom: 8%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.va { left: 4%; width: 30%; }
+.vm { left: 34.2%; width: 31.6%; }
+.vb { left: 66%; width: 30%; }
+
+/* 행 꼬리표 */
+.ch { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 7px; border: 1px solid var(--grey-200); border-radius: 8px; background: var(--bg); font-size: 12px; white-space: nowrap; }
+.ch b { font-weight: 700; color: var(--accent-text); }
+.ch.hl { border-color: var(--blue); background: var(--blue-50); }
+.ch.dim { border-style: dashed; background: none; color: var(--mute); }
+.ch.dim b { color: var(--mute); }
+
+/* 결과 표 */
+.rh { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 4px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.rh code { font-size: 12px; font-weight: 600; color: var(--grey-800); }
+.rt { display: grid; gap: 3px; align-content: start; }
+.r { display: grid; grid-template-columns: 56px 1fr 1fr; align-items: center; height: 24px; padding: 0 8px; border: 1px solid var(--grey-200); border-radius: 8px; font-size: 13px; }
+.r.head { height: 18px; border: 0; padding: 0 8px; font-size: 11px; font-weight: 600; color: var(--mute); }
+.r.hl { border-color: var(--blue); background: var(--blue-50); font-weight: 700; }
+.r .nul { font-weight: 700; color: var(--mute); }
+.r.empty { display: block; border-style: dashed; color: var(--mute); }
+
+/* 직접 해 보기: 고르는 칸 (input과 같은 모양) */
+.sim-sel { flex: 1; min-width: 0; height: 48px; padding: 0 12px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-sel:focus { border-color: var(--accent-text); }
+.sim-row .sim-btn { flex: 1; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>inner join과 left join 결과</h1>
+  </header>
+  <a class="sim-q" data-q="04-database/3"><span><small>관련 질문</small><b>inner join과 left join 차이</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>대출 한 건의 회원번호를 바꾸면 벤 다이어그램과 결과 표를 다시 계산해서 보여 줘요.</p>
+    <div class="sim-row">
+      <select class="sim-sel" name="row" required aria-label="바꿀 대출"></select>
+      <select class="sim-sel" name="key" required aria-label="새 회원번호"></select>
+    </div>
+    <div class="sim-row">
+      <button class="sim-btn">바꿔서 보기</button>
+      <button type="button" class="sim-btn ghost" id="again">처음 값으로</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 표: member(왼쪽, 회원번호와 이름), loan(오른쪽, 대출 번호마다 빌린 회원번호). 값은 이 시뮬레이션용으로 지은 것
+const MEM = [{ id: 1, name: '하린' }, { id: 2, name: '도겸' }, { id: 3, name: '서아' }, { id: 4, name: '이안' }];
+const DEFAULT = [1, 1, 3, 5]; // L1~L4가 가진 회원번호. 5번 회원은 없어서 짝이 없다
+let keys = [...DEFAULT];
+
+// join 규칙 그대로 계산: 같은 회원번호끼리 짝, 짝 없는 회원, 짝 없는 대출
+function calc() {
+  const pairs = [], lonelyA = [];
+  for (const m of MEM) {
+    const ls = keys.map((k, i) => (k === m.id ? i : -1)).filter(i => i >= 0);
+    if (ls.length) ls.forEach(i => pairs.push({ ...m, loan: 'L' + (i + 1) }));
+    else lonelyA.push(m);
+  }
+  const lonelyB = keys.map((k, i) => ({ k, loan: 'L' + (i + 1) })).filter(x => !MEM.some(m => m.id === x.k));
+  // left join 전체 결과: 짝 있는 행 + 짝 없는 회원(대출 NULL), 회원번호 순
+  const left = [...pairs, ...lonelyA.map(m => ({ ...m, loan: null }))].sort((a, b) => a.id - b.id);
+  return { pairs, lonelyA, lonelyB, left };
+}
+
+// 단계 만들기: sorted(영역 나눔), out(결과 표 0 비움, 1 짝만, 2 전체), shade(칠할 영역), dimA/dimB(빠지는 쪽 흐리게)
+function build(kind) {
+  const c = calc(), left = kind === 'left';
+  const base = { c, kind, keys: [...keys], final: left ? c.left : c.pairs };
+  const n = c.pairs.length;
+  const s = [
+    { caption: '회원 표와 대출 표를 두 원에 나눠 놓았어요.', sorted: false, out: 0 },
+    { caption: n ? '회원번호가 같은 행끼리 짝을 지어 가운데로 모아요.' : '회원번호가 같은 행이 없어서 가운데는 비어 있어요.', sorted: true, out: 0, pop: true },
+    {
+      caption: left
+        ? (n ? '먼저 겹친 영역의 짝을 결과 표에 담아요.' : '겹친 짝이 없어서 아직 결과 표는 비어 있어요.')
+        : (n ? `겹친 영역의 짝만 결과 표에 담겨요. 결과는 ${n}행이에요.` : '겹친 영역이 비어서 결과 표도 비어 있어요.'),
+      sorted: true, out: 1, shade: 'lens',
+    },
+  ];
+  if (left) {
+    s.push({
+      caption: c.lonelyA.length ? '왼쪽 표는 전부 남아요. 짝 없는 회원은 대출 칸이 NULL이에요.' : '짝 없는 회원이 없어서 NULL 행은 생기지 않아요.',
+      sorted: true, out: 2, shade: 'a',
+    });
+    s.push({
+      caption: c.lonelyB.length ? '오른쪽에만 있는 대출은 짝이 없어서 결과에서 빠져요.' : '오른쪽에만 있는 대출이 없어서 더 빠지는 행은 없어요.',
+      sorted: true, out: 2, shade: 'a', dimB: true,
+    });
+  } else {
+    s.push({
+      caption: c.lonelyA.length || c.lonelyB.length ? '겹치지 않은 행은 짝이 없어서 결과에서 빠져요.' : '겹치지 않은 행이 없어서 빠지는 행도 없어요.',
+      sorted: true, out: 1, shade: 'lens', dimA: true, dimB: true,
+    });
+  }
+  return s.map(x => ({ ...base, ...x }));
+}
+
+// 그리기: 벤 다이어그램(원 + 영역별 행 꼬리표) + 결과 표
+function render(s, stage) {
+  const { c } = s;
+  const chip = (html, cls = '') => `<span class="ch ${cls}">${html}</span>`;
+  const memChip = (m, cls) => chip(`<b>키 ${m.id}</b>${m.name}`, cls);
+  const loanChip = (loan, k, cls) => chip(`${loan}<b>키 ${k}</b>`, cls);
+  const a = s.sorted
+    ? c.lonelyA.map(m => memChip(m, `${s.shade === 'a' ? 'hl ' : ''}${s.dimA ? 'dim' : ''}`))
+    : MEM.map(m => memChip(m));
+  const b = s.sorted
+    ? c.lonelyB.map(x => loanChip(x.loan, x.k, s.dimB ? 'dim' : ''))
+    : keys.map((k, i) => loanChip('L' + (i + 1), k));
+  const mid = s.sorted
+    ? c.pairs.map(p => chip(`<b>${p.id}</b>${p.name} ${p.loan}`, `${s.shade === 'lens' && !s.dimA ? 'hl ' : ''}${s.pop ? 'sim-pop' : ''}`))
+    : [];
+  const rows = s.out === 0 ? [] : s.out === 1 ? c.pairs : c.left;
+  const fresh = r => s.out === 2 && r.loan === null;
+  const body = rows.length
+    ? rows.map(r => `<div class="r${fresh(r) ? ' hl sim-pop' : ''}"><span class="num">${r.id}</span><span>${r.name}</span>${r.loan ? `<span>${r.loan}</span>` : '<span class="nul">NULL</span>'}</div>`).join('')
+    : `<div class="r empty">${s.out === 0 ? '아직 비어 있어요' : '결과 행이 없어요'}</div>`;
+  // 표 높이를 마지막 단계에 맞춰 고정해서 단계를 넘겨도 화면이 흔들리지 않게 한다
+  const reserve = Math.max(s.final.length, 1) * 27;
+  stage.innerHTML = `
+    <div class="vl"><span>A member (왼쪽 표)</span><span>B loan (오른쪽 표)</span></div>
+    <div class="venn">
+      <svg viewBox="0 0 342 210" aria-hidden="true">
+        <defs><clipPath id="clipA"><circle cx="122" cy="105" r="103"/></clipPath></defs>
+        <circle class="vc${s.shade === 'a' ? ' on' : ''}" cx="122" cy="105" r="103"/>
+        <circle class="vc" cx="220" cy="105" r="103"/>
+        <circle class="lens${s.shade ? ' on' : ''}" cx="220" cy="105" r="103" clip-path="url(#clipA)"/>
+      </svg>
+      <div class="vcol va">${a.join('')}</div>
+      <div class="vcol vm">${mid.join('')}</div>
+      <div class="vcol vb">${b.join('')}</div>
+    </div>
+    <div class="rh"><span>결과 표 <span class="num">${rows.length}</span>행</span><code>member ${s.kind === 'left' ? 'LEFT' : 'INNER'} JOIN loan</code></div>
+    <div class="rt" style="min-height:${reserve + 21}px">
+      <div class="r head"><span>회원번호</span><span>회원</span><span>대출</span></div>
+      ${body}
+    </div>`;
+}
+
+// 직접 해 보기: 고른 대출의 회원번호를 바꿔서 지금 보는 join의 단계를 새로 만들어 재생
+const f = document.getElementById('try');
+const rowSel = f.row, keySel = f.key;
+rowSel.innerHTML = keys.map((_, i) => `<option value="${i}">대출 L${i + 1}</option>`).join('');
+keySel.innerHTML = [...MEM.map(m => `<option value="${m.id}">번호 ${m.id} (${m.name})</option>`), '<option value="5">번호 5 (회원 없음)</option>'].join('');
+const sync = () => { keySel.value = keys[Number(rowSel.value)]; };
+sync();
+rowSel.addEventListener('change', sync);
+const curKind = () => (document.querySelector('.sim-tabs [aria-pressed=true]').textContent === 'left join' ? 'left' : 'inner');
+f.addEventListener('submit', e => {
+  e.preventDefault();
+  const i = Number(rowSel.value), k = Number(keySel.value);
+  if (!Number.isInteger(i) || i < 0 || i > 3 || !Number.isInteger(k) || k < 1 || k > 5) return;
+  keys[i] = k;
+  Sim.load(build(curKind()));
+  Sim.play(true);
+});
+document.getElementById('again').addEventListener('click', () => { keys = [...DEFAULT]; sync(); Sim.reset(); });
+
+// 탭을 바꿔도 바꾼 값이 이어지도록 모드 단계를 getter로 만든다
+Sim.start({ modes: { get 'inner join'() { return build('inner'); }, get 'left join'() { return build('left'); } }, render });
+</script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쿠키와 세션 로그인 흐름</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위쪽 칸: 브라우저, 서버, (세션 저장소) 와 지금 들고 있는 값 */
+.lh { display: grid; grid-template-columns: repeat(var(--n), 1fr); }
+.lh > div { margin: 0 3px; padding: 8px 6px; border: 1px solid var(--grey-200); border-radius: 12px; text-align: center; }
+.lh > div.chg { border-color: var(--blue); background: var(--blue-50); }
+.lh b { display: block; font-size: 14px; font-weight: 700; }
+.lh span { display: block; min-height: 32px; margin-top: 2px; font-size: 12px; line-height: 1.35; color: var(--ink-2); }
+.lh .chg span { font-weight: 700; color: var(--accent-text); }
+
+/* 아래쪽: 칸마다 세로 점선, 메시지는 한 줄씩 쌓인다 */
+.seq { position: relative; margin-top: 10px; }
+.ln { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--grey-200); }
+.msg { position: relative; height: 42px; opacity: .32; }
+.msg.done, .msg.now { opacity: 1; }
+.tx, .me { position: absolute; top: 2px; font-size: 12.5px; font-weight: 600; line-height: 20px; white-space: nowrap; }
+.tx { text-align: center; }
+.tx i { padding: 0 3px; background: var(--bg); font-style: normal; }
+.now .tx, .now .me { color: var(--accent-text); }
+.no { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 4px; border-radius: 50%; background: var(--grey-100); font-size: 11px; font-weight: 700; vertical-align: 1px; }
+.now .no { background: var(--accent-text); color: var(--bg); }
+
+/* 화살표: 선 + 머리 */
+.ar { position: absolute; top: 28px; height: 2px; background: currentColor; color: var(--chev); }
+.now .ar { color: var(--accent-text); }
+.ar::after { content: ""; position: absolute; top: -4px; border: 5px solid transparent; }
+.ar.r::after { right: -1px; border-width: 5px 0 5px 8px; border-left-color: currentColor; }
+.ar.l::after { left: -1px; border-width: 5px 8px 5px 0; border-right-color: currentColor; }
+
+/* 한 칸 안에서 일어나는 일 (회원 확인, 쿠키 저장 같은 것) */
+.me { padding: 1px 9px; border-radius: 8px; background: var(--grey-100); transform: translateX(-50%); }
+.me.lf { transform: none; left: 0; }
+.now .me { box-shadow: inset 0 0 0 1px var(--blue); background: var(--blue-50); }
+
+.err { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--red); }
+.err:empty { display: none; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>쿠키와 세션 로그인 흐름</h1>
+  </header>
+  <!-- 질문 하나가 쿠키, 세션 두 모드에 걸쳐서 data-mode로 나누지 않고 둘 다 항상 보인다 -->
+  <a class="sim-q" data-q="05-network/8"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>쿠키와 세션의 차이</b></span></a>
+  <a class="sim-q" data-q="05-network/9" style="margin-top: 8px"><span><small>관련 질문</small><b>쿠키와 세션으로 로그인하는 흐름</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>사용자 번호(1~999)를 넣으면 그 사용자가 로그인하는 9단계를 보여 줘요. 번호마다 session ID가 달라져요.</p>
+    <div class="sim-row">
+      <input name="u" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" required placeholder="예: 17" aria-label="사용자 번호(숫자)">
+      <button class="sim-btn">로그인</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="err" id="err" role="alert"></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 칸 이름. 쿠키, 세션 모드는 두 칸, 로그인 모드는 세 칸
+const TWO = ['브라우저', '서버'];
+const THREE = ['브라우저', '서버', '세션 저장소'];
+
+// 단계 하나: notes = 칸마다 들고 있는 값, chg = 방금 바뀐 칸, msgs = [보낸 칸, 받은 칸, 글자], at = 지금 메시지
+const stepOf = (names, msgs, at, notes, chg, caption) => ({ caption, names, msgs, at, notes, chg });
+
+// 쿠키 모드: 값(theme=dark)이 브라우저에만 있다
+const CK = [[0, 1, '페이지 요청'], [1, 0, 'Set-Cookie: theme=dark'], [0, 1, '요청 + Cookie: theme=dark'], [1, 0, '다크 모드 화면으로 응답']];
+const empty = ['쿠키 칸: 비어 있음', '서버에 저장: 없음'], held = ['쿠키 칸: theme=dark', '서버에 저장: 없음'];
+const COOKIE = [
+  stepOf(TWO, CK, 0, empty, [], '처음 방문이라 쿠키 칸이 비어 있어요. 페이지를 요청해요.'),
+  stepOf(TWO, CK, 1, held, [0], '서버가 응답에 값을 실어 보내고, 브라우저가 쿠키 칸에 저장해요.'),
+  stepOf(TWO, CK, 2, held, [], '다음 요청부터 브라우저가 Cookie 헤더에 값을 자동으로 붙여요.'),
+  stepOf(TWO, CK, 3, held, [], '서버는 쿠키 값을 읽어 응답해요. 값은 브라우저에만 있어요.'),
+];
+
+// 세션 모드: 쿠키에는 session ID만, 진짜 정보(장바구니)는 서버에 보관한다
+const SS = [[0, 1, '페이지 요청'], [1, 0, 'Set-Cookie: sid=K9Q2'], [0, 1, '요청 + Cookie: sid=K9Q2'], [1, 0, '장바구니 2개가 담긴 화면 응답']];
+const none = ['쿠키 칸: 비어 있음', '세션 보관: 없음'], kept = ['쿠키 칸: sid=K9Q2', '세션 보관: K9Q2 → 장바구니 2개'];
+const SESSION = [
+  stepOf(TWO, SS, 0, none, [], '이번엔 서버가 정보를 보관하는 방식이에요. 페이지를 요청해요.'),
+  stepOf(TWO, SS, 1, kept, [0, 1], '서버가 장바구니 정보를 보관하고, 쿠키로는 ID만 보내요.'),
+  stepOf(TWO, SS, 2, kept, [], '브라우저는 쿠키 칸의 session ID만 자동으로 붙여 보내요.'),
+  stepOf(TWO, SS, 3, kept, [1], '서버가 ID로 보관한 정보를 찾아 응답해요. 정보는 서버에만 있어요.'),
+];
+
+// 사용자 번호마다 다른 예시 session ID (진짜 ID는 추측할 수 없는 무작위 값이에요)
+const sidOf = u => (u * 40503 % 65536).toString(16).toUpperCase().padStart(4, '0');
+
+// 로그인 모드: 사용자 번호 u가 로그인하는 9단계
+function loginSteps(u) {
+  const sid = sidOf(u);
+  const msgs = [
+    [0, 1, '로그인 요청'], [1, 1, '회원 정보 확인'], [1, 1, 'session ID 만들기'], [1, 2, '사용자 정보와 ID 저장'],
+    [1, 0, `Set-Cookie: sid=${sid}`], [0, 0, '쿠키 칸에 저장'], [0, 1, '요청 + Cookie 자동 첨부'],
+    [1, 2, 'ID로 사용자 찾기'], [1, 0, '사용자 맞춤 응답'],
+  ];
+  const caps = [
+    '사용자가 아이디와 비밀번호로 로그인을 요청해요.',
+    '서버가 회원 정보와 맞는지 확인해요. 이것이 인증이에요.',
+    '성공하면 서버가 추측하기 어려운 session ID를 만들어요.',
+    '서버가 session ID와 사용자 정보를 세션 저장소에 저장해요.',
+    '서버가 응답에 session ID만 실어 브라우저에 보내요.',
+    '브라우저는 받은 session ID를 쿠키 칸에 저장해요.',
+    '다음 요청부터 브라우저가 Cookie 헤더에 ID를 자동으로 붙여요.',
+    `ID에 맞는 세션을 찾았어요. 사용자는 ${u}번이에요.`,
+    '권한을 확인하고 그 사용자에게 맞는 응답을 돌려줘요.',
+  ];
+  const chg = [[], [], [1], [2], [], [0], [], [2], []];
+  return caps.map((c, j) => stepOf(THREE, msgs, j, [
+    `쿠키 칸: ${j >= 5 ? `sid=${sid}` : '비어 있음'}`,
+    j < 2 ? '아직 누군지 몰라요' : j < 4 ? `새 ID: ${sid}` : j >= 7 ? `사용자 ${u}번 확인` : '대기 중',
+    `저장된 세션: ${j >= 3 ? `${sid} → 사용자 ${u}` : '없음'}`,
+  ], chg[j], c));
+}
+
+// 그리기: 위에 칸 이름과 값, 아래에 메시지 줄. 지나간 줄은 진하게, 지금 줄은 파랗게, 아직 줄은 흐리게
+function render(s, stage) {
+  const n = s.names.length, c = k => (2 * k + 1) / (2 * n) * 100;
+  const rows = s.msgs.map(([a, b, t], j) => {
+    const state = j < s.at ? 'done' : j === s.at ? 'now' : 'next';
+    const no = `<b class="no">${j + 1}</b>`;
+    const label = `aria-label="${s.names[a]}에서 ${s.names[b]}로: ${t}"`;
+    if (a === b) return `<div class="msg ${state}" role="img" ${label}><span class="me${a === 0 ? ' lf' : ''}" style="left:${a === 0 ? 0 : c(a)}%">${no}${t}</span></div>`;
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    return `<div class="msg ${state}" role="img" ${label}>
+      <span class="tx" style="left:${lo / n * 100}%;width:${(hi - lo + 1) / n * 100}%"><i>${no}${t}</i></span>
+      <span class="ar ${a < b ? 'r' : 'l'}" style="left:${c(lo)}%;width:${c(hi) - c(lo)}%"></span></div>`;
+  });
+  stage.innerHTML = `
+    <div class="lh" style="--n:${n}">${s.names.map((name, k) => `<div${s.chg.includes(k) ? ' class="chg"' : ''}><b>${name}</b><span${s.chg.includes(k) ? ' class="sim-pop"' : ''}>${s.notes[k]}</span></div>`).join('')}</div>
+    <div class="seq">${s.names.map((_, k) => `<i class="ln" style="left:${c(k)}%"></i>`).join('')}${rows.join('')}</div>`;
+}
+
+// 직접 해 보기: 사용자 번호로 로그인 9단계를 만들어 자동 재생 (1~999 밖이면 안내만)
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const u = Number(e.target.u.value), err = document.getElementById('err');
+  if (!Number.isInteger(u) || u < 1 || u > 999) { err.textContent = '1부터 999 사이 숫자를 넣어 주세요.'; return; }
+  err.textContent = '';
+  document.querySelectorAll('.sim-tabs button')[2].click(); // 로그인 탭으로 옮기고
+  Sim.load(loginSteps(u));
+  Sim.play(true);
+  e.target.reset();
+});
+
+Sim.start({ modes: { 쿠키: COOKIE, 세션: SESSION, 로그인: loginSteps(17) }, render });
+</script>
+</body>
+</html>

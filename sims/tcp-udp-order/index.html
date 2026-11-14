@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCP와 UDP의 패킷 순서</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 칸(lane): 보내는 앱, 도착 순서, 보관함, 받는 앱 */
+.lane { padding: 8px 10px 10px; border: 1px solid var(--grey-200); border-radius: 12px; }
+.lane > small { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.lane p { min-height: 18px; margin-top: 6px; font-size: 12px; color: var(--ink-2); }
+
+/* 칸 안의 자리 3개 */
+.sl3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sl3 > span, .hold > span { min-width: 0; min-height: 44px; display: grid; place-content: center; border-radius: 8px; font-size: 13px; font-weight: 700; text-align: center; line-height: 1.3; }
+.sl3 small, .hold small { font-size: 11px; font-weight: 600; }
+.e { border: 1px dashed var(--grey-200); font-weight: 500 !important; color: var(--ink-2); }
+
+/* 메시지는 회색, packet은 파랑. 늦은 packet은 점선 */
+.m { background: var(--grey-100); }
+.pk { background: var(--blue-50); border: 1px solid var(--blue); }
+.pk.late { border-style: dashed; }
+.pk.cur { box-shadow: 0 0 0 2px var(--blue); }
+.pk small { color: var(--accent-text); }
+.bad { background: var(--red-50); border: 1px solid var(--red); }
+.bad small { color: var(--red); }
+
+/* 보관함 */
+.hold { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; min-height: 44px; }
+.hold .m { border: 1px dashed var(--blue); background: var(--bg); }
+.hold .none { grid-column: 1 / -1; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+
+/* 칸 사이 화살표 */
+.dn { display: flex; align-items: center; justify-content: center; gap: 4px; height: 26px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.dn .sim-ic { width: 16px; height: 16px; }
+
+/* 직접 해 보기 선택 칸 */
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 12px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-row select:focus { border-color: var(--accent-text); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>TCP와 UDP의 패킷 순서</h1>
+  </header>
+  <a class="sim-q" data-q="05-network/2"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>TCP와 UDP 비교</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>어느 packet이 늦을지 골라 보세요. 지금 보는 방식(TCP 또는 UDP)으로 다시 보여 줘요.</p>
+    <div class="sim-row">
+      <select name="late" required aria-label="늦게 도착할 packet 번호">
+        <option value="1">1번 packet이 늦음</option>
+        <option value="2" selected>2번 packet이 늦음</option>
+        <option value="3">3번 packet이 늦음</option>
+      </select>
+      <button class="sim-btn">재생</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시: 앱이 message 1, 2, 3을 차례로 보내고, late번 packet만 마지막에 도착한다
+const N = [1, 2, 3];
+
+// 모드(TCP/UDP)와 늦을 packet으로 단계 목록을 만든다
+function build(mode, late) {
+  const tcp = mode === 'TCP';
+  const order = [...N.filter(n => n !== late), late]; // 도착 순서
+  const base = { mode, late: 0, arr: [], held: [], got: [], cur: 0, fresh: [] };
+  const steps = [
+    { ...base, caption: tcp ? 'TCP는 연결을 맺은 뒤 message 세 개를 packet에 담아 차례로 보내요.' : 'UDP는 연결 없이 message 세 개를 packet에 담아 바로 보내요.' },
+    { ...base, late, caption: `이번에 늦는 건 ${late}번 packet이에요. ${late < 3 ? '나머지가 먼저 도착해요.' : '마지막이라 순서는 안 바뀌어요.'}` },
+  ];
+
+  let arr = [], held = [], got = [];
+  for (const p of order) {
+    const before = got.length;
+    arr = [...arr, p];
+    let cap;
+    if (tcp) {
+      // TCP: 받을 차례 번호까지 이어지는 만큼만 앱에 넘기고 나머지는 보관
+      held = [...held, p].sort((a, b) => a - b);
+      while (held.includes(got.length + 1)) { const n = got.length + 1; got = [...got, n]; held = held.filter(x => x !== n); }
+      const moved = got.slice(before);
+      cap = !moved.length ? `${p}번 packet이 먼저 왔어요. ${got.length + 1}번이 아직이라 보관(hold)해요.`
+        : moved.length === 1 ? `${p}번 packet이 도착했어요. 순서가 맞아 바로 앱에 넘겨요.`
+        : `${p}번 packet이 도착했어요. 기다리던 ${moved[0]}번부터 ${moved.at(-1)}번까지 차례로 넘겨요.`;
+    } else {
+      // UDP: 온 순서 그대로 앱에 넘긴다
+      got = [...got, p];
+      cap = p === got.length ? `${p}번 packet이 도착했어요. UDP는 온 순서대로 앱에 넘겨요.`
+        : p > got.length ? `${p}번 packet이 먼저 왔어요. UDP는 기다리지 않고 바로 앱에 넘겨요.`
+        : `${p}번 packet이 뒤늦게 왔어요. UDP는 순서를 안 맞춰서 맨 끝에 받아요.`;
+    }
+    steps.push({ mode, late, arr, held, got, cur: p, fresh: got.slice(before), caption: cap });
+  }
+
+  const inOrder = got.every((n, i) => n === i + 1);
+  const result = tcp ? (late === 3 ? '늦은 packet이 마지막이라 기다릴 일이 없었어요.' : '대신 기다린 만큼 전달은 늦어졌어요.')
+    : inOrder ? '이번에는 순서가 맞았지만 UDP는 보장하지 않아요.' : '순서가 필요하면 앱이 직접 맞춰야 해요.';
+  steps.push({ mode, late, arr, held, got, cur: 0, fresh: [], caption: `앱은 ${got.join(', ')} 순서로 받았어요. ${result}` });
+  return steps;
+}
+
+const SIM = { TCP: build('TCP', 2), UDP: build('UDP', 2) };
+
+const ARROW = '<svg class="sim-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5l0 14 M18 13l-6 6l-6 -6"/></svg>';
+const chip = (cls, text, sub = '') => `<span class="${cls}">${text}${sub ? `<small>${sub}</small>` : ''}</span>`;
+// 자리 3개: 빈 자리는 n번째, 찬 자리는 mk(값, 자리 번호)
+const slots = (list, mk) => [0, 1, 2].map(i => list[i] === undefined ? `<span class="e">${i + 1}번째</span>` : mk(list[i], i)).join('');
+
+// 그리기: 보내는 앱 > 도착 순서 > 보관함 > 받는 앱
+function render(s, stage) {
+  const tcp = s.mode === 'TCP';
+  const status = s.arr.length === 3 ? '세 packet이 모두 도착했어요.'
+    : s.late ? `${s.late}번 packet은 아직 오는 중이에요.` : 'packet 세 개가 네트워크를 지나는 중이에요.';
+  const hold = !tcp ? '<span class="none">UDP는 보관 없이 바로 넘겨요</span>'
+    : s.held.length ? s.held.map(n => chip(`m${n === s.cur ? ' sim-pop' : ''}`, `message ${n}`)).join('') : '<span class="none">비어 있어요</span>';
+  stage.innerHTML = `
+    <div class="lane"><small>보내는 쪽 앱</small><div class="sl3">${N.map(n => chip('m', `message ${n}`)).join('')}</div></div>
+    <div class="dn">${ARROW}<span>packet에 담아 네트워크로</span></div>
+    <div class="lane"><small>받는 쪽에 도착한 순서</small><div class="sl3">${slots(s.arr, p => chip(`pk${p === s.late ? ' late' : ''}${p === s.cur ? ' cur sim-pop' : ''}`, `packet ${p}`, p === s.late ? '늦게 도착' : ''))}</div><p>${status}</p></div>
+    <div class="dn">${ARROW}<span>${tcp ? '순서를 확인해요' : '확인 없이 그대로'}</span></div>
+    <div class="lane"><small>${tcp ? '받는 쪽 TCP 보관함(hold)' : '받는 쪽 보관함'}</small><div class="hold">${hold}</div></div>
+    <div class="dn">${ARROW}<span>앱에 전달</span></div>
+    <div class="lane"><small>받는 쪽 앱이 받은 순서</small><div class="sl3">${slots(s.got, (n, i) => {
+      const wrong = n !== i + 1;
+      return chip(`m${wrong ? ' bad' : ''}${s.fresh.includes(n) ? ' sim-pop' : ''}`, `message ${n}`, wrong ? '순서 틀림' : '');
+    })}</div></div>`;
+}
+
+// 직접 해 보기: 고른 packet이 늦는 경우를 지금 모드로 만들어 자동 재생
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const late = Number(e.target.late.value);
+  if (!N.includes(late)) return; // 선택지 밖의 값은 무시
+  Sim.load(build(Sim.step().mode, late));
+  Sim.play(true);
+});
+
+Sim.start({ modes: SIM, render });
+</script>
+</body>
+</html>

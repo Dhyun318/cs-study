@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BST 만들기와 순회</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위 줄: 칩 여러 개 (노드 수, 높이, 규칙 검사 / 서브트리 범위 / 순회 고르기) */
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 40px; }
+.chip { padding: 4px 10px; border-radius: 8px; background: var(--grey-100); font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.chip b { color: var(--ink); }
+.chip.ok { background: var(--blue-50); color: var(--accent-text); }
+.chip.bad { background: var(--red-50); color: var(--red); }
+.chip.l { background: var(--blue-50); box-shadow: inset 0 0 0 1.5px var(--blue); }
+.chip.r { box-shadow: inset 0 0 0 1.5px var(--grey-700); background: var(--grey-100); }
+
+/* 순회 고르기: 중위 / 전위 / 후위 */
+.seg { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--grey-100); }
+.seg button { height: 34px; min-width: 52px; border: 0; border-radius: 8px; background: none; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.seg [aria-pressed="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.rule { font-size: 14px; font-weight: 700; color: var(--accent-text); }
+
+/* 트리 그림: SVG 하나 */
+.tree { margin-top: 4px; }
+.tree svg { display: block; width: 100%; height: auto; }
+.ed { stroke: var(--chev); stroke-width: 1.5; }
+.ed.on { stroke: var(--blue); stroke-width: 3; }
+.nd circle { fill: var(--bg); stroke: var(--chev); stroke-width: 1.5; }
+.nd text { font-size: 14px; font-weight: 700; text-anchor: middle; dominant-baseline: central; fill: var(--ink); font-variant-numeric: tabular-nums; pointer-events: none; }
+.nd.seen circle { fill: var(--blue-50); stroke: var(--blue); stroke-width: 2; }
+.nd.cur circle { fill: var(--accent-text); stroke: var(--accent-text); }
+.nd.ok circle { fill: var(--cta); stroke: var(--cta); }
+.nd.cur text, .nd.ok text { fill: #fff; }
+.nd.cur, .nd.ok { transform-box: fill-box; transform-origin: center; }
+.nd[data-v] { cursor: pointer; }
+.nd[data-v]:focus-visible { outline: none; }
+.nd[data-v]:focus-visible circle { stroke: var(--accent-text); stroke-width: 3; }
+.bxl { fill: var(--blue-50); fill-opacity: .7; stroke: var(--blue); stroke-width: 1.5; }
+.bxr { fill: var(--grey-100); stroke: var(--grey-700); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.empty { font-size: 14px; font-weight: 600; text-anchor: middle; fill: var(--mute); }
+
+/* 방문 순서 줄: 순서대로 칸이 채워진다 */
+.rh { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; }
+.rh small { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.rh b { font-size: 14px; color: var(--accent-text); }
+.rs { display: flex; flex-wrap: wrap; gap: 4px; min-height: 68px; margin-top: 6px; align-content: flex-start; }
+.ch { min-width: 34px; height: 32px; padding: 0 4px; display: grid; place-items: center; border: 1.5px dashed var(--grey-200); border-radius: 8px; font-size: 14px; font-weight: 700; }
+.ch.f { border: 0; background: var(--grey-100); }
+.ch.now { background: var(--accent-text); color: #fff; }
+.ch.sorted { background: var(--cta); color: #fff; }
+
+/* 직접 해 보기 안내 */
+.err { min-height: 20px; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--red); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>BST 만들기와 순회</h1>
+  </header>
+  <a class="sim-q" data-q="02-data-structure/10"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 2개">2</span>BST 구조와 서브트리</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>0~99 숫자를 넣으면 지금 보이는 트리에 BST 규칙대로 붙어요. 서브트리 탭에서는 노드를 눌러 봐요. 노드는 11개, 5층까지예요.</p>
+    <div class="sim-row">
+      <input name="v" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" required placeholder="예: 47" aria-label="넣을 값(0부터 99까지 숫자)">
+      <button class="sim-btn">넣기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="err" id="msg" role="alert"></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 값 8개. 이 순서로 넣으면 42(18(9, 30(24)), 66(54, 81)) 모양이 된다
+const ORDER = [42, 18, 66, 9, 30, 54, 81, 24];
+const R = 15, MAXN = 11, MAXH = 5; // 노드 반지름, 최대 노드 수, 최대 층 수
+
+// 트리: { v, l, r } 중첩 객체(바꾸지 않고 새로 만든다). 빈 트리는 null
+const put = (n, v) => !n ? { v } : v < n.v ? { ...n, l: put(n.l, v) } : { ...n, r: put(n.r, v) };
+const tall = n => n ? 1 + Math.max(tall(n.l), tall(n.r)) : 0;
+const find = (n, v) => n.v === v ? n : find(v < n.v ? n.l : n.r, v);
+const route = (n, v) => { const p = []; for (; n; n = v < n.v ? n.l : n.r) p.push(n.v); return p; }; // v가 내려가며 만나는 노드들
+const links = (n, out = []) => { if (n) for (const c of [n.l, n.r]) if (c) { out.push([n.v, c.v]); links(c, out); } return out; };
+// 규칙 검사: 모든 노드가 (아래한계, 위한계) 사이에 있어야 한다. 서브트리 전체에 적용된다
+const okBST = (n, lo = -Infinity, hi = Infinity) => !n || (n.v > lo && n.v < hi && okBST(n.l, lo, n.v) && okBST(n.r, n.v, hi));
+
+// 순회 3가지: 값 목록을 돌려준다
+const inorder = n => n ? [...inorder(n.l), n.v, ...inorder(n.r)] : [];
+const WALK = {
+  중위: inorder,
+  전위: function pre(n) { return n ? [n.v, ...pre(n.l), ...pre(n.r)] : []; },
+  후위: function post(n) { return n ? [...post(n.l), ...post(n.r), n.v] : []; },
+};
+const RULE = { 중위: '왼쪽 → 나 → 오른쪽', 전위: '나 → 왼쪽 → 오른쪽', 후위: '왼쪽 → 오른쪽 → 나' };
+
+const TREE = ORDER.reduce(put, null);
+
+// 만들기 단계: v를 넣는다. path = 내려간 길
+function buildStep(t, v) {
+  const path = route(t, v);
+  const caption = path.length
+    ? `${v} 삽입. 경로: ${path.map(a => `${a} ${v < a ? '왼쪽' : '오른쪽'}`).join(' → ')}, 빈 자리에 붙어요.`
+    : `첫 값(${v})은 비교할 상대가 없어서 루트가 돼요.`;
+  return { type: 'build', tree: put(t, v), path, nw: v, caption };
+}
+const BUILD = [{ type: 'build', tree: null, path: [], caption: '빈 트리예요. 새 값은 루트와 비교해 작으면 왼쪽, 크면 오른쪽으로 내려가요.' }];
+ORDER.reduce((t, v) => { BUILD.push(buildStep(t, v)); return put(t, v); }, null);
+BUILD.push({ type: 'build', tree: TREE, path: [], caption: '완성! 어느 노드에서 봐도 왼쪽은 작고 오른쪽은 커요. 일부 교재 그림은 이 규칙을 어긴 예가 있어요.' });
+
+// 서브트리 단계: sel 노드를 고르면 왼쪽, 오른쪽 서브트리가 상자로 묶인다
+function subStep(t, sel, caption) {
+  const n = find(t, sel);
+  caption ||= n.l && n.r ? `노드 ${sel} 기준 왼쪽 서브트리는 모두 더 작고, 오른쪽은 모두 더 커요.`
+    : n.l ? `노드 ${sel} 기준 오른쪽은 비었어요. 왼쪽 서브트리는 모두 더 작아요.`
+    : n.r ? `노드 ${sel} 기준 왼쪽은 비었어요. 오른쪽 서브트리는 모두 더 커요.`
+    : `노드 ${sel} 아래에는 서브트리가 없어요. 자식이 없는 leaf예요.`;
+  return { type: 'sub', tree: t, sel, caption };
+}
+const SUB = [
+  subStep(TREE, 42, '루트(42)를 골랐어요. 왼쪽 서브트리는 모두 더 작고, 오른쪽은 모두 더 커요.'),
+  subStep(TREE, 18, '서브트리 안에서도 같은 규칙이에요. 노드 18 기준으로 다시 나뉘어요.'),
+  subStep(TREE, 30, '노드 30은 왼쪽에만 자식이 있어요. 오른쪽 서브트리는 비어 있어요.'),
+  subStep(TREE, 42, '규칙은 서브트리 전체에 적용돼요. 24는 루트(42)보다도 작아서 왼쪽 상자 안에 있어요.'),
+];
+
+// 순회 단계: 처음 설명, 노드마다 방문 한 단계, 끝 정리
+const INTRO = { 중위: '중위 순회는 왼쪽, 나 자신, 오른쪽 순서예요. 맨 왼쪽 아래부터 방문해요.', 전위: '전위 순회는 나 자신, 왼쪽, 오른쪽 순서예요. 루트부터 방문해요.', 후위: '후위 순회는 왼쪽, 오른쪽, 나 자신 순서예요. 루트가 마지막이에요.' };
+const OUTRO = { 중위: '끝! 방문 순서가 오름차순이에요. BST의 중위 순회는 정렬 결과예요.', 전위: '끝! 전위 순회는 정렬 순서가 아닐 수 있어요. 루트가 맨 앞이에요.', 후위: '끝! 후위 순회는 정렬 순서가 아닐 수 있어요. 루트가 맨 뒤예요.' };
+function visitText(kind, n) {
+  const leaf = !n.l && !n.r;
+  if (kind === '중위') return n.l ? '왼쪽 서브트리를 다 본 뒤라 이제 방문해요.' : '왼쪽에 갈 곳이 없어서 바로 방문해요.';
+  if (kind === '전위') return leaf ? '먼저 방문했고 자식이 없어 되돌아가요.' : '자식보다 먼저 방문하고, 그다음 왼쪽으로 가요.';
+  return leaf ? '자식이 없어서 바로 방문해요.' : '왼쪽, 오른쪽을 다 본 뒤 마지막에 방문해요.';
+}
+function travSteps(kind, t, prefix = '') {
+  const order = WALK[kind](t), base = { type: 'trav', kind, tree: t };
+  return [
+    { ...base, done: [], cur: null, caption: prefix + INTRO[kind] },
+    ...order.map((v, i) => ({ ...base, done: order.slice(0, i + 1), cur: v, caption: `${i + 1}번째로 ${v} 방문. ${visitText(kind, find(t, v))}` })),
+    { ...base, done: order, cur: null, end: true, caption: OUTRO[kind] },
+  ];
+}
+
+// 자리 계산: x는 중위 순서대로 일정 간격, y는 깊이. 이렇게 하면 서브트리가 가로로 한 덩어리가 된다
+function layout(t) {
+  const vals = inorder(t), n = vals.length, step = n > 1 ? Math.min(40, 252 / (n - 1)) : 0, pos = {};
+  vals.forEach((v, i) => { pos[v] = [150 + (i - (n - 1) / 2) * step, 0]; });
+  (function down(nd, d) { if (nd) { pos[nd.v][1] = 28 + d * 54; down(nd.l, d + 1); down(nd.r, d + 1); } })(t, 0);
+  return { pos, step };
+}
+
+// 그리기: 위 줄 + 트리 SVG (+ 순회에서는 방문 순서 줄)
+function render(s, stage) {
+  const t = s.tree, { pos, step } = layout(t), vals = inorder(t);
+  const onSet = new Set(s.type === 'build' ? [...s.path, s.nw] : []);
+  const box = (n, cls) => {
+    const vs = inorder(n);
+    if (!vs.length) return '';
+    const xs = vs.map(v => pos[v][0]), ys = vs.map(v => pos[v][1]), p = Math.min(R + 3, step / 2 + 4);
+    return `<rect class="${cls}" x="${Math.min(...xs) - p}" y="${Math.min(...ys) - p}" width="${Math.max(...xs) - Math.min(...xs) + 2 * p}" height="${Math.max(...ys) - Math.min(...ys) + 2 * p}" rx="12"/>`;
+  };
+  const sel = s.type === 'sub' ? find(t, s.sel) : null;
+  const rng = n => { const vs = inorder(n); return vs.length ? (vs.length === 1 ? vs[0] : `${vs[0]}~${vs.at(-1)}`) : '없음'; };
+
+  let bar = '';
+  if (s.type === 'build') bar = `<span class="chip">노드 <b class="num">${vals.length}</b>개</span><span class="chip">높이 <b class="num">${tall(t)}</b>층</span>`
+    + (t ? `<span class="chip ${okBST(t) ? 'ok' : 'bad'}">${okBST(t) ? 'BST 규칙 OK' : '규칙 위반'}</span>` : '');
+  if (s.type === 'sub') bar = `<span class="chip l">왼쪽 서브트리 <b class="num">${rng(sel.l)}</b></span><span class="chip r">오른쪽 서브트리 <b class="num">${rng(sel.r)}</b></span>`;
+  if (s.type === 'trav') bar = `<div class="seg" role="group" aria-label="순회 방식">${Object.keys(WALK).map(k => `<button type="button" data-k="${k}" aria-pressed="${k === s.kind}">${k}</button>`).join('')}</div><span class="rule">${RULE[s.kind]}</span>`;
+
+  const lines = links(t).map(([a, b]) => `<line class="ed${onSet.has(a) && onSet.has(b) ? ' on' : ''}" x1="${pos[a][0]}" y1="${pos[a][1]}" x2="${pos[b][0]}" y2="${pos[b][1]}"/>`).join('');
+  const boxes = sel ? box(sel.l, 'bxl') + box(sel.r, 'bxr') : '';
+  const circles = vals.map(v => {
+    const st = s.type === 'build' ? (v === s.nw ? ' ok sim-pop' : onSet.has(v) ? ' seen' : '')
+      : s.type === 'sub' ? (v === s.sel ? ' cur' : '')
+      : (v === s.cur ? ' cur sim-pop' : s.done.includes(v) ? ' seen' : '');
+    const pick = s.type === 'sub' ? ` data-v="${v}" tabindex="0" role="button" aria-label="노드 ${v} 선택"` : '';
+    return `<g class="nd${st}"${pick}><circle cx="${pos[v][0]}" cy="${pos[v][1]}" r="${R}"/><text x="${pos[v][0]}" y="${pos[v][1]}">${v}</text></g>`;
+  }).join('');
+  const none = t ? '' : '<text class="empty" x="150" y="136">빈 트리</text>';
+
+  let result = '';
+  if (s.type === 'trav') {
+    const good = s.end && s.kind === '중위';
+    const chips = vals.map((_, i) => i >= s.done.length ? '<span class="ch"></span>'
+      : `<span class="ch f num${good ? ' sorted' : i === s.done.length - 1 && s.cur !== null ? ' now sim-pop' : ''}">${s.done[i]}</span>`).join('');
+    result = `<div class="rh"><small>방문 순서</small><b>${s.end ? (good ? '오름차순 정렬!' : '정렬 보장 없음') : ''}</b></div><div class="rs">${chips}</div>`;
+  }
+  stage.innerHTML = `<div class="bar">${bar}</div><div class="tree"><svg viewBox="0 0 300 272" role="img" aria-label="이진 탐색 트리">${boxes}${lines}${none}${circles}</svg></div>${result}`;
+}
+
+// 조작 1: 순회 방식 고르기, 서브트리 노드 누르기 (그림 안 요소에 붙이는 이벤트)
+const stage = document.getElementById('sim-stage');
+function onPick(e) {
+  const k = e.target.closest('[data-k]')?.dataset.k, v = e.target.closest('[data-v]')?.dataset.v;
+  if (k) { Sim.load(travSteps(k, Sim.step().tree)); Sim.play(true); }
+  if (v) Sim.load([subStep(Sim.step().tree, Number(v))]);
+}
+stage.addEventListener('click', onPick);
+stage.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(e); } });
+
+// 조작 2: 직접 해 보기. 지금 보이는 트리에 값을 넣고, 보던 화면(만들기, 서브트리, 순회)으로 이어 보여 준다
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const raw = e.target.v.value.trim(), v = /^\d{1,2}$/.test(raw) ? Number(raw) : NaN, s = Sim.step(), t = s.tree;
+  const err = Number.isNaN(v) ? '0부터 99까지 숫자만 넣을 수 있어요.'
+    : inorder(t).includes(v) ? '이미 있는 값이에요. 같은 값은 두 번 넣지 않아요.'
+    : inorder(t).length >= MAXN ? `노드는 ${MAXN}개까지예요. 처음부터를 눌러 다시 해 봐요.`
+    : tall(put(t, v)) > MAXH ? `${MAXH}층을 넘어서 그림에 안 들어가요. 다른 값을 넣어 봐요.` : '';
+  document.getElementById('msg').textContent = err;
+  if (err) return;
+  const t2 = put(t, v);
+  if (s.type === 'trav') { Sim.load(travSteps(s.kind, t2, `${v} 삽입 완료. `)); Sim.play(true); }
+  else if (s.type === 'sub') Sim.load([subStep(t2, t2.v, `${v} 삽입 완료. 노드를 눌러 서브트리를 봐요.`)]);
+  else Sim.load([buildStep(t, v)]);
+  e.target.reset();
+});
+
+Sim.start({ modes: { 만들기: BUILD, 서브트리: SUB, 순회: travSteps('중위', TREE) }, render });
+</script>
+</body>
+</html>

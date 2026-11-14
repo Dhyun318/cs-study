@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>주소창에 주소를 입력한 뒤</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 단계 이름 */
+.ttl { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: var(--accent-text); }
+
+/* 세 곳: DNS 서버, 브라우저, 웹 서버. 지금 일하는 곳은 파랗게 */
+.nodes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.node { display: grid; justify-items: center; gap: 2px; min-width: 0; padding: 10px 4px 8px; border: 1.5px solid var(--grey-200); border-radius: 14px; text-align: center; transition: background-color .2s, border-color .2s; }
+.node.on { border-color: var(--blue); background: var(--blue-50); }
+.node .sim-ic { width: 26px; height: 26px; color: var(--grey-700); }
+.node.on .sim-ic { color: var(--accent-text); }
+.node b { font-size: 14px; font-weight: 700; }
+.node small { min-height: 32px; font-size: 12px; font-weight: 600; line-height: 1.35; color: var(--ink-2); }
+.node.on small { color: var(--accent-text); }
+
+/* 화살표 줄: 보내는 쪽에서 받는 쪽으로. 열 가운데에서 가운데까지 */
+.lane { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; height: 46px; }
+.way { display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; margin: 0 calc(100% / (var(--n) * 2)); padding-bottom: 8px; text-align: center; }
+.way span { font-size: 12px; font-weight: 700; color: var(--accent-text); }
+.way i { position: relative; display: block; height: 2px; background: var(--accent-text); }
+.way i::before, .way i::after { content: ""; position: absolute; top: -4px; width: 0; height: 0; border: 5px solid transparent; }
+.way.r i::after, .way.b i::after { right: -2px; border-left: 8px solid var(--accent-text); border-right: 0; }
+.way.l i::before, .way.b i::before { left: -2px; border-right: 8px solid var(--accent-text); border-left: 0; }
+
+/* 지금 오가는 데이터 */
+.pay { min-height: 118px; padding: 10px 12px; border-radius: 14px; background: var(--grey-100); }
+.pay h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.parts { display: flex; gap: 6px; }
+.part { flex: 1; min-width: 0; padding: 8px 6px; border-radius: 10px; background: var(--bg); text-align: center; }
+.part b { display: block; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.part small { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-2); }
+.lines { display: grid; gap: 4px; }
+.lines span { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+
+/* 패킷: 머리(헤더)들과 HTTP 메시지가 한 줄로 */
+.pk { display: flex; gap: 4px; align-items: stretch; }
+.pk .hd { flex: none; display: grid; place-items: center; width: 52px; padding: 4px; border: 1.5px solid var(--grey-200); border-radius: 8px; background: var(--bg); font-size: 12px; font-weight: 700; text-align: center; line-height: 1.3; }
+.pk .hd.off { border-style: dashed; background: none; color: var(--mute); }
+.pk .bd { flex: 1; min-width: 0; padding: 8px 10px; border: 1.5px solid var(--blue); border-radius: 8px; background: var(--bg); }
+.pk .bd b { display: block; margin-bottom: 4px; font-size: 12px; color: var(--accent-text); }
+.pk .bd span { display: block; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.note { margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+
+/* 화면 그리기 단계: 작은 브라우저 창 */
+.win { border: 1.5px solid var(--grey-200); border-radius: 10px; background: var(--bg); overflow: hidden; }
+.win .bar { padding: 5px 10px; border-bottom: 1px solid var(--grey-200); background: var(--grey-100); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.win .pg { display: grid; place-items: center; padding: 14px 10px; }
+.win .pg span { width: 70%; padding: 6px 0; border: 1.5px solid var(--grey-200); border-radius: 999px; text-align: center; font-size: 12px; color: var(--ink-2); }
+
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 12px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-row select:focus { border-color: var(--accent-text); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>주소창에 주소를 입력한 뒤</h1>
+  </header>
+  <a class="sim-q" data-q="05-network/7"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 2개">2</span>주소 입력부터 화면이 뜨기까지</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>보고 싶은 단계 번호를 고르면 그 단계로 바로 가요.</p>
+    <div class="sim-row">
+      <select name="n" aria-label="이동할 단계 번호"></select>
+      <button class="sim-btn">이동</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 값: 문서용 도메인(example)과 문서용 IP 대역(192.0.2.0/24)
+const HOST = 'www.example.com', IP = '192.0.2.10';
+const NODES = ['DNS 서버', '브라우저', '웹 서버'];
+
+// Tabler 아이콘: world, device-desktop, server
+const ic = d => `<svg class="sim-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+const ICONS = [
+  ic('M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0 M3.6 9h16.8 M3.6 15h16.8 M11.5 3a17 17 0 0 0 0 18 M12.5 3a17 17 0 0 1 0 18'),
+  ic('M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1l0 -10 M7 20h10 M9 16v4 M15 16v4'),
+  ic('M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z M7 8l0 .01 M7 16l0 .01'),
+];
+
+// 오가는 메시지 두 가지: 줄 내용은 예시. head = 붙은 머리 목록, off = 머리를 뗀 상태
+const REQ = { label: 'HTTP 요청 메시지', lines: ['GET / HTTP/1.1', `Host: ${HOST}`] };
+const RES = { label: 'HTTP 응답 메시지', lines: ['HTTP/1.1 200 OK', 'HTML 페이지 data'] };
+
+// 단계: name 제목, on 일하는 곳(0 DNS, 1 브라우저, 2 서버), sub 각 곳의 상태, way 화살표, pay 데이터
+const STEPS = [
+  { name: '1. URL 입력', caption: '주소창에 주소를 입력해요. 브라우저가 스킴, 호스트, 경로로 나눠 읽어요.',
+    on: [1], sub: ['대기', '주소 입력됨', '대기'], pay: { kind: 'url' } },
+  { name: '2. DNS 질의', caption: '도메인으로는 보낼 수 없어서 DNS 서버에 IP를 물어봐요. 그리고 답을 받아요.',
+    on: [0, 1], sub: ['IP 알려 줌', 'IP 받음', '대기'], way: { from: 0, to: 1, dir: 'b', label: '도메인 질문, IP 답' },
+    pay: { kind: 'text', lines: [`질문: ${HOST} IP 주소는?`, `답: ${IP}`] } },
+  { name: '3. HTTP 요청', caption: '받은 IP로 보낼 HTTP 요청 메시지를 만들어요. 이 페이지를 달라는 내용이에요.',
+    on: [1], sub: ['대기', '요청 만듦', '대기'], pay: { kind: 'msg', ...REQ, head: [] } },
+  { name: '4. TCP/IP 패킷', caption: '요청 메시지에 TCP, IP 헤더를 붙여 패킷으로 만들고, 서버로 보내요.',
+    on: [1], sub: ['대기', '패킷 보냄', '대기'], way: { from: 1, to: 2, dir: 'r', label: 'TCP/IP 패킷' },
+    pay: { kind: 'msg', ...REQ, head: ['IP', 'TCP'], pop: true } },
+  { name: '5. 서버 수신', caption: '도착한 패킷에서 헤더를 떼고, 안의 요청 메시지를 꺼내 서버 프로세스에 넘겨요.',
+    on: [2], sub: ['대기', '응답 기다림', '요청 받음'], pay: { kind: 'msg', ...REQ, head: ['IP', 'TCP'], off: true, note: '헤더는 떼어 내요' } },
+  { name: '6. 응답 data', caption: '서버 프로세스가 요청에 맞는 웹 페이지 data로 HTTP 응답 메시지를 만들어요.',
+    on: [2], sub: ['대기', '응답 기다림', '응답 만듦'], pay: { kind: 'msg', ...RES, head: [] } },
+  { name: '7. 패킷과 응답', caption: '응답 메시지도 요청 때처럼 패킷에 담겨 브라우저로 돌아와요.',
+    on: [2], sub: ['대기', '패킷 받는 중', '패킷 보냄'], way: { from: 2, to: 1, dir: 'l', label: 'TCP/IP 패킷' },
+    pay: { kind: 'msg', ...RES, head: ['IP', 'TCP'], pop: true } },
+  { name: '8. 렌더링 출력', caption: '브라우저가 응답 속 HTML을 읽어 화면을 그려요. 모니터에 페이지가 보여요.',
+    on: [1], sub: ['대기', '화면 그림', '응답 끝'], pay: { kind: 'page' } },
+];
+
+// 데이터 칸: 종류별로 그린다
+function payHtml(p) {
+  if (p.kind === 'url') return `<div class="parts">
+    <span class="part"><b>https</b><small>스킴</small></span>
+    <span class="part" style="flex:2.6"><b class="num">${HOST}</b><small>호스트</small></span>
+    <span class="part"><b>/</b><small>경로</small></span></div>`;
+  if (p.kind === 'text') return `<div class="lines">${p.lines.map(t => `<span class="num">${t}</span>`).join('')}</div>`;
+  if (p.kind === 'page') return `<div class="win"><div class="bar num">${HOST}</div><div class="pg"><span>검색창</span></div></div>`;
+  const heads = p.head.map(h => `<span class="hd${p.off ? ' off' : p.pop ? ' sim-pop' : ''}">${h}<br>헤더</span>`).join('');
+  return `<div class="pk">${heads}<div class="bd"><b>${p.label}</b>${p.lines.map(t => `<span class="num">${t}</span>`).join('')}</div></div>
+    ${p.note ? `<p class="note">${p.note}</p>` : ''}`;
+}
+
+// 그리기: 세 곳 + 화살표 줄 + 지금 오가는 데이터
+function render(s, stage) {
+  const w = s.way, n = w ? Math.abs(w.to - w.from) + 1 : 1, at = w ? Math.min(w.from, w.to) + 1 : 1;
+  stage.innerHTML = `
+    <div class="ttl">${s.name}</div>
+    <div class="nodes">${NODES.map((t, i) => `<div class="node${s.on.includes(i) ? ' on' : ''}">${ICONS[i]}<b>${t}</b><small>${s.sub[i]}</small></div>`).join('')}</div>
+    <div class="lane">${w ? `<div class="way ${w.dir} sim-pop" style="grid-column:${at} / span ${n};--n:${n}"><span>${w.label}</span><i></i></div>` : ''}</div>
+    <div class="pay"><h3>지금 오가는 데이터</h3>${payHtml(s.pay)}</div>`;
+}
+
+// 직접 해 보기: 단계 번호 고르기. 처음부터 불러온 뒤 다음을 눌러 그 단계로 간다
+const sel = document.querySelector('#try select');
+sel.innerHTML = STEPS.map((s, i) => `<option value="${i + 1}">${s.name}</option>`).join('');
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const n = Number(sel.value);
+  if (!(n >= 1 && n <= STEPS.length)) return;
+  Sim.load(STEPS);
+  for (let k = 1; k < n; k++) document.querySelector('[data-act=next]').click();
+});
+
+Sim.start({ steps: STEPS, render });
+</script>
+</body>
+</html>

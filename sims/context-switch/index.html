@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context switch</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위: 시간 흐름 띠 (실행 / 전환 / 실행 ...) */
+.tl { display: flex; gap: 4px; }
+.tl span { flex: 1; height: 28px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 8px; background: var(--grey-100); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.tl .sw { flex: 1.5; }
+.tl .on { border-color: var(--blue); background: var(--blue-50); color: var(--accent-text); }
+
+/* 패널 공통 */
+.pn { margin-top: 6px; padding: 8px 10px; border: 1px solid var(--grey-200); border-radius: 14px; }
+.pn.hl { border-color: var(--blue); background: var(--blue-50); }
+.pn small { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.off { opacity: .4; }
+
+/* CPU: 누구 값을 들고 있는지 + PC, register */
+.hd { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-size: 14px; }
+.hd span { font-size: 13px; font-weight: 600; color: var(--accent-text); }
+.regs { display: flex; gap: 6px; margin-top: 6px; }
+.regs div { flex: 1; display: flex; justify-content: space-between; gap: 4px; padding: 3px 8px; border-radius: 8px; background: var(--bg); font-size: 13px; }
+.regs i, .pc i { font-style: normal; color: var(--ink-2); }
+.regs b, .pc b { font-weight: 700; }
+.hl .regs div { background: var(--bg); }
+
+/* 저장/복구 화살표 줄 */
+.flow { height: 22px; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--accent-text); }
+
+/* 커널 영역: PCB 카드 둘 */
+.pcbs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+.pc { padding: 6px 8px; border: 1px solid var(--grey-200); border-radius: 10px; background: var(--bg); }
+.pc.hl { border-color: var(--blue); background: var(--blue-50); }
+.pc.pick { border: 2px solid var(--accent-text); padding: 5px 7px; }
+.pc .hd { margin-bottom: 2px; }
+.pc .hd span { font-size: 12px; }
+.pc p { display: flex; justify-content: space-between; gap: 4px; font-size: 13px; line-height: 1.55; }
+.pc .nil { color: var(--mute); }
+
+/* 메모리: process 셋, 영역 네 칸씩 */
+.mem { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px; }
+.pm { padding: 4px; border: 1px solid var(--grey-200); border-radius: 8px; text-align: center; }
+.pm.hl { border-color: var(--blue); }
+.pm b { display: block; font-size: 12px; font-weight: 700; }
+.pm div { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: 3px; }
+.pm span { padding: 2px 0; border-radius: 4px; background: var(--grey-100); font-size: 11px; font-weight: 600; color: var(--grey-700); }
+.pm .pcr { background: var(--blue); color: #fff; }
+
+/* 직접 해 보기: 고르기 칸 */
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 12px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-row select:focus { border-color: var(--accent-text); }
+.sim-row.wrap { flex-wrap: wrap; }
+.sim-row.wrap .sim-btn { flex: 1 1 140px; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Context switch</h1>
+  </header>
+  <a class="sim-q" data-q="03-os/2"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 4개">4</span>Multi process 개념</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>PCB를 고르면 지금 단계에서 그 PCB가 저장 중인지 복구 중인지 보여 줘요. 아래 버튼은 지금 CPU를 쓰던 process를 다른 process로 넘겨요.</p>
+    <div class="sim-row">
+      <select name="p" aria-label="볼 PCB 고르기">
+        <option value="1">1번 PCB</option>
+        <option value="2">2번 PCB</option>
+      </select>
+      <button class="sim-btn">내용 보기</button>
+    </div>
+    <div class="sim-row wrap">
+      <button type="button" class="sim-btn" id="swap">CPU를 다른 process로 넘기기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 값(직접 지음): PC는 명령어 주소, R1, R2는 register 값
+const hex = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
+const ARROW = { save: 'M12 5v14 M18 13l-6 6l-6 -6', load: 'M12 5l0 14 M18 11l-6 -6l-6 6' };
+
+// 상태 S = { cpu: 지금 CPU에 올라간 값, pcb: 번호별 PCB }. 단계 = S 복사 + 설명 + 지금 하는 일(act)
+const START = {
+  cpu: { who: 0, pc: null, r1: null, r2: null },
+  pcb: { 1: { st: 'running', pc: null, r1: null, r2: null }, 2: { st: 'ready', pc: 0x2C18, r1: 42, r2: 5 } },
+};
+const mk = (S, caption, extra = {}) => ({ caption, ...structuredClone({ cpu: S.cpu, pcb: S.pcb }), ...extra });
+
+// 번호 a가 CPU를 쓰는 중에서 b로 넘기는 단계 셋: a 저장, b 복구, b 실행
+function swap(S, a) {
+  const b = 3 - a, out = [], n = structuredClone(S);
+  n.pcb[a] = { st: 'ready', pc: n.cpu.pc, r1: n.cpu.r1, r2: n.cpu.r2 };
+  out.push(mk(n, `CPU의 PC와 register 값을 ${a}번 PCB에 저장해요. 이제 ${a}번 process는 ready예요.`, { act: { n: a, kind: 'save' }, tl: 2 * a - 1 }));
+  const { pc, r1, r2 } = n.pcb[b];
+  n.cpu = { who: b, pc, r1, r2 };
+  n.pcb[b].st = 'running';
+  out.push(mk(n, `${b}번 PCB에 있던 값을 CPU의 PC와 register로 불러와요.`, { act: { n: b, kind: 'load' }, tl: 2 * a - 1 }));
+  n.cpu = { who: b, pc: pc + 16, r1: r1 + 3, r2 };
+  out.push(mk(n, `${b}번 process가 저장해 둔 자리부터 이어서 실행해요. PC가 앞으로 가요.`, { tl: b === 1 ? 4 : 2 }));
+  return out;
+}
+
+const RUN1 = { ...START, cpu: { who: 1, pc: 0x1A64, r1: 7, r2: 3 } };
+const STEPS = [
+  mk(START, 'process마다 stack, heap, data, code를 따로 차지해요. 서로 침범하지 않아요.', { mem: true }),
+  mk(RUN1, 'CPU가 1번 process를 실행 중이에요. PC와 register에 1번 값이 들어 있어요.', { tl: 0 }),
+];
+STEPS.push(...swap(RUN1, 1));
+STEPS.push(...swap(STEPS.at(-1), 2));
+
+// 그리기: 시간 띠, CPU, 화살표, 커널의 PCB, 메모리
+function render(s, stage) {
+  const run = s.cpu.who, v = x => (x === null ? '-' : x);
+  const tl = ['P1', '전환', 'P2', '전환', 'P1'].map((t, i) => `<span class="${i % 2 ? 'sw ' : ''}${i === s.tl ? 'on' : ''}">${t}</span>`);
+  const arrow = s.act ? `<svg class="sim-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${ARROW[s.act.kind]}"/></svg>${s.act.n}번 PCB${s.act.kind === 'save' ? '에 저장' : '에서 복구'}` : '';
+  const pcb = n => {
+    const p = s.pcb[n], act = s.act && s.act.n === n;
+    const tag = act ? (s.act.kind === 'save' ? '저장 중' : '복구 중') : run === n ? 'CPU 사용' : '보관';
+    return `<div class="pc${act ? ' hl sim-pop' : ''}${s.view === n ? ' pick' : ''}">
+      <div class="hd"><b>${n}번 PCB</b><span>${tag}</span></div>
+      <p><i>상태</i><b>${p.st}</b></p>
+      <p class="num"><i>PC</i><b class="${p.pc === null ? 'nil' : ''}">${p.pc === null ? '-' : hex(p.pc)}</b></p>
+      <p class="num"><i>R1</i><b>${v(p.r1)}</b></p>
+      <p class="num"><i>R2</i><b>${v(p.r2)}</b></p></div>`;
+  };
+  const mem = n => `<div class="pm${run === n ? ' hl' : ''}"><b>${n}번 process</b><div><span>stack</span><span>heap</span><span>data</span><span class="${run === n ? 'pcr' : ''}">code</span></div></div>`;
+  stage.innerHTML = `
+    <div class="tl${s.mem ? ' off' : ''}">${tl.join('')}</div>
+    <div class="pn${s.act ? ' hl' : ''}${s.mem ? ' off' : ''}">
+      <div class="hd"><b>CPU</b><span>${run ? run + '번 process 값' : '아직 비어 있어요'}</span></div>
+      <div class="regs num"><div><i>PC</i><b>${s.cpu.pc === null ? '-' : hex(s.cpu.pc)}</b></div><div><i>R1</i><b>${v(s.cpu.r1)}</b></div><div><i>R2</i><b>${v(s.cpu.r2)}</b></div></div>
+    </div>
+    <div class="flow">${arrow}</div>
+    <div class="pn${s.mem ? ' off' : ''}" style="margin-top:0"><small>커널 영역</small><div class="pcbs">${pcb(1)}${pcb(2)}</div></div>
+    <div class="pn${s.mem ? ' hl' : ''}"><small>메모리: process마다 자기 영역</small><div class="mem">${mem(1)}${mem(2)}${mem(3)}</div></div>`;
+}
+
+// 직접 해 보기 1: 고른 PCB가 지금 단계에서 어떤 상태인지 보여 준다
+function describe(s, p) {
+  if (s.act && s.act.n === p) {
+    return s.act.kind === 'save' ? `${p}번 PCB는 지금 저장 중이에요. CPU의 PC와 register 값이 들어가요.` : `${p}번 PCB는 지금 복구 중이에요. 저장해 둔 값이 CPU로 올라가요.`;
+  }
+  if (s.cpu.who === p) return `${p}번 process가 CPU를 쓰는 중이에요. PCB 값은 멈출 때 새로 저장돼요.`;
+  return `${p}번 PCB는 지금 값을 그대로 보관 중이에요. 차례가 오면 이 값으로 이어서 실행해요.`;
+}
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const p = e.target.p.value === '2' ? 2 : 1, cur = Sim.step();
+  Sim.load([{ ...structuredClone(cur), caption: describe(cur, p), view: p }]);
+});
+
+// 직접 해 보기 2: 지금 CPU를 쓰는 process를 다른 process로 넘기는 단계를 이어 붙인다
+document.getElementById('swap').addEventListener('click', () => {
+  const cur = Sim.step(), a = cur.cpu.who || 1;
+  Sim.load(swap(cur.cpu.who ? cur : RUN1, a));
+  Sim.play(true);
+});
+
+Sim.start({ steps: STEPS, render });
+</script>
+</body>
+</html>

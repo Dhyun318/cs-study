@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시뮬레이션</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="_kit/kit.css">
+<style>
+/* 과목 묶음: 흰 묶음 안에 한 줄씩. 항목이 없는 과목은 숨긴다 */
+.top { padding: 20px 20px 4px; }
+.top h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.top p { margin-top: 4px; font-size: 14px; color: var(--ink-2); }
+section { margin: 12px 12px 0; padding: 6px 0; border-radius: 20px; background: var(--bg); }
+section:not(:has(li)) { display: none; }
+section h2 { padding: 14px 20px 4px; font-size: 15px; font-weight: 700; color: var(--ink-2); }
+ul { margin: 0; padding: 0; list-style: none; }
+li a { display: flex; align-items: center; gap: 4px; min-height: 52px; padding: 12px 20px; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; transition: background-color .12s; }
+li a:active { background: var(--grey-100); }
+li a::after { content: ""; flex: none; width: 16px; height: 16px; margin-left: auto; background: var(--chev); -webkit-mask: var(--i-chev) center / contain no-repeat; mask: var(--i-chev) center / contain no-repeat; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="top">
+    <h1>동작으로 보기</h1>
+    <p>개념을 단계별로 움직여 보고 직접 값을 넣어 봐요.</p>
+  </header>
+
+  <!-- 새 시뮬레이션 등록: 맞는 과목 ul 안에 li 한 줄. 별은 관련 질문 중 가장 많은 개수 (sims/CLAUDE.md) -->
+  <section><h2>자료구조</h2><ul>
+    <li><a href="hash-table/index.html"><span class="sim-star" aria-label="별 4개">4</span>Hash table 저장과 충돌</a></li>
+    <li><a href="bst-search/index.html"><span class="sim-star" aria-label="별 2개">2</span>BST 키 검색</a></li>
+    <li><a href="bst-structure/index.html"><span class="sim-star" aria-label="별 2개">2</span>BST 만들기와 순회</a></li>
+    <li><a href="heap/index.html"><span class="sim-star" aria-label="별 1개">1</span>Heap 삽입과 삭제</a></li>
+    <li><a href="dynamic-array/index.html">Dynamic Array 크기 늘리기</a></li>
+    <li><a href="linked-list/index.html">Linked List 끼우기와 빼기</a></li>
+    <li><a href="queue-stack/index.html">Queue와 Stack 넣고 빼기</a></li>
+  </ul></section>
+
+  <section><h2>운영체제</h2><ul>
+    <li><a href="context-switch/index.html"><span class="sim-star" aria-label="별 4개">4</span>Context switch (PCB 저장과 복구)</a></li>
+    <li><a href="race-condition/index.html"><span class="sim-star" aria-label="별 1개">1</span>경쟁 상태</a></li>
+    <li><a href="mutex/index.html"><span class="sim-star" aria-label="별 1개">1</span>Mutex lock과 unlock</a></li>
+    <li><a href="semaphore/index.html"><span class="sim-star" aria-label="별 1개">1</span>Semaphore wait와 signal</a></li>
+    <li><a href="deadlock/index.html"><span class="sim-star" aria-label="별 1개">1</span>Deadlock, 서로 기다리다 멈추기</a></li>
+    <li><a href="process-memory/index.html"><span class="sim-star" aria-label="별 2개">2</span>Process 메모리와 thread</a></li>
+    <li><a href="ipc/index.html"><span class="sim-star" aria-label="별 2개">2</span>Process 간 통신</a></li>
+    <li><a href="virtual-memory/index.html"><span class="sim-star" aria-label="별 1개">1</span>가상 메모리와 page fault</a></li>
+    <li><a href="paging/index.html">Paging 주소 매핑</a></li>
+    <li><a href="segmentation/index.html">Segmentation 주소 변환</a></li>
+  </ul></section>
+
+  <section><h2>데이터베이스</h2><ul>
+    <li><a href="transaction-lock/index.html"><span class="sim-star" aria-label="별 2개">2</span>Transaction 동시 접근과 Lock</a></li>
+    <li><a href="bplus-tree/index.html"><span class="sim-star" aria-label="별 1개">1</span>B+tree 탐색과 범위 검색</a></li>
+    <li><a href="index-search/index.html">Index 검색 경로</a></li>
+    <li><a href="db-keys/index.html">table 용어와 key 종류</a></li>
+    <li><a href="er-relationship/index.html">1:N, N:M 관계와 PK/FK 연결</a></li>
+    <li><a href="join-types/index.html">inner join과 left join 결과</a></li>
+  </ul></section>
+
+  <section><h2>네트워크</h2><ul>
+    <li><a href="google-request/index.html"><span class="sim-star" aria-label="별 2개">2</span>주소창에 주소를 입력한 뒤</a></li>
+    <li><a href="http-message/index.html"><span class="sim-star" aria-label="별 2개">2</span>HTTP 메시지와 GET, POST</a></li>
+    <li><a href="encapsulation/index.html"><span class="sim-star" aria-label="별 1개">1</span>캡슐화와 역캡슐화</a></li>
+    <li><a href="tcp-udp-order/index.html"><span class="sim-star" aria-label="별 1개">1</span>TCP와 UDP의 패킷 순서</a></li>
+    <li><a href="tcp-udp-header/index.html"><span class="sim-star" aria-label="별 1개">1</span>TCP 헤더와 UDP 헤더 비교</a></li>
+    <li><a href="cookie-session/index.html"><span class="sim-star" aria-label="별 1개">1</span>쿠키와 세션 로그인 흐름</a></li>
+    <li><a href="tcp-handshake/index.html">TCP 3-way, 4-way handshake</a></li>
+  </ul></section>
+</div>
+</body>
+</html>

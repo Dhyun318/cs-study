@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deadlock, 서로 기다리다 멈추기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 자원 카드 두 장: 이름, 쥔 쪽, 기다리는 쪽 */
+.res { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rc { display: grid; gap: 1px; padding: 8px 10px; border: 1.5px solid var(--grey-200); border-radius: 12px; }
+.rc small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.rc b { font-size: 16px; font-weight: 700; }
+.rc em { font-size: 12px; font-style: normal; font-weight: 600; color: var(--ink-2); }
+.rc.o1 { border-color: var(--blue); background: var(--blue-50); }
+.rc.o2 { border-color: var(--chev); background: var(--grey-100); }
+.rc.bad { border-color: var(--red); background: var(--red-50); }
+
+/* 주체 카드 두 장: 왼쪽 첫째, 오른쪽 둘째. 안에 잠그는 순서대로 동작 두 줄 */
+.who { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.tc { padding: 8px; border-radius: 14px; background: var(--blue-50); }
+.tc.t2 { background: var(--grey-100); }
+.tc header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 6px; }
+.tc header b { font-size: 14px; font-weight: 700; }
+.tc header span { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.ac { display: grid; margin-top: 6px; padding: 6px 8px; border: 1.5px solid transparent; border-radius: 10px; background: var(--bg); }
+.ac b { font-size: 13px; line-height: 1.3; }
+.ac small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.ac.held { border-color: var(--blue); }
+.ac.held small { color: var(--accent-text); }
+.ac.wait { border: 1.5px dashed var(--chev); }
+.ac.todo { border: 1.5px dashed var(--grey-200); }
+.ac.free, .ac.undo { background: none; border-color: var(--grey-200); }
+.ac.now { box-shadow: 0 0 0 2px var(--accent-text); }
+.dead .ac.wait { border-color: var(--red); background: var(--red-50); }
+.dead .ac.wait b, .dead .ac.wait small { color: var(--red); }
+
+/* 아래 칸: 지금 상태 + 기다림 관계. OS 모드 마지막에는 네 조건 */
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: var(--grey-100); }
+.foot.os { min-height: 132px; }
+.pill { padding: 3px 10px; border-radius: 8px; background: var(--bg); font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.pill.bad { background: var(--red-50); color: var(--red); }
+.pill.ok { background: var(--blue-50); color: var(--accent-text); }
+.wf { font-size: 14px; font-weight: 700; }
+.cond { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
+.cond div { display: grid; gap: 1px; padding: 6px 8px; border-radius: 10px; background: var(--bg); }
+.cond b { font-size: 13px; }
+.cond small { font-size: 12px; line-height: 1.35; color: var(--ink-2); }
+
+/* 직접 해 보기: 고르기 한 칸 */
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font: inherit; font-size: 15px; }
+.err { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--red); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Deadlock, 서로 기다리다 멈추기</h1>
+  </header>
+  <a class="sim-q" data-q="03-os/7" data-mode="OS 스레드"><span><small>관련 질문</small><b>교착상태</b></span></a>
+  <a class="sim-q" data-q="04-database/6" data-mode="DB 트랜잭션"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>DB 데드락</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try" novalidate>
+    <h2>직접 해 보기</h2>
+    <p>두 쪽이 lock을 잡는 순서를 골라, 보고 있는 모드에서 다시 돌려 봐요. 같은 순서면 교착이 안 생기고, 반대 순서면 생겨요.</p>
+    <div class="sim-row">
+      <select name="order" aria-label="lock 잡는 순서">
+        <option value="cross">서로 반대 순서로 잡기</option>
+        <option value="same">둘 다 같은 순서로 잡기</option>
+        <option value="fix">반대 순서, 생기면 풀어 주기</option>
+      </select>
+      <button class="sim-btn">돌려 보기</button>
+    </div>
+    <div class="sim-row">
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="err" id="err" role="alert" hidden></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 두 모드의 이름표. s, t, o = 이름 뒤에 붙는 조사(가/는/를). 자원 이름은 모두 모음으로 끝나 를, 는을 쓴다
+const KIND = {
+  os: {
+    th: [{ n: '스레드 P', k: 'P', s: '가', o: '를' }, { n: '스레드 Q', k: 'Q', s: '가', o: '를' }],
+    res: ['프린터', '스캐너'], dead: '교착상태예요', undo: '회수됨', victim: '종료됨',
+    intro: { cross: '스레드 P는 프린터부터, 스레드 Q는 스캐너부터 쓰려 해요. 둘 다 두 자원이 모두 필요해요.', same: '스레드 P와 Q는 둘 다 프린터를 먼저, 스캐너를 나중에 쓰려 해요.' },
+  },
+  db: {
+    th: [{ n: 'T1', k: 'T1', s: '이', o: '을' }, { n: 'T2', k: 'T2', s: '가', o: '를' }],
+    res: ['계좌 X', '계좌 Y'], dead: '데드락이에요', undo: 'ROLLBACK', victim: 'ROLLBACK',
+    intro: { cross: 'T1은 계좌 X부터, T2는 계좌 Y부터 잠그려 해요. 둘 다 두 계좌에 Lock이 필요해요.', same: 'T1과 T2는 둘 다 계좌 X를 먼저, 계좌 Y를 나중에 잠그려 해요.' },
+  },
+};
+
+// 단계 목록 만들기. order: cross = 서로 반대, same = 같은 순서, fix = 반대 순서 + 풀어 주기
+// 단계 값: lk = 자원별 쥔 쪽(0 없음, 1, 2), prog = 잡은 lock 수, wait = 기다리는 중, end = 끝남(done)/되돌림(rb), f = 방금 움직인 [주체, 동작]
+function build(kind, order) {
+  const K = KIND[kind], [a, b] = K.th, [ra, rb] = K.res;
+  const plan = order === 'same' ? [[0, 1], [0, 1]] : [[0, 1], [1, 0]];
+  const S = (caption, o = {}) => ({ caption, kind, plan, lk: [0, 0], prog: [0, 0], wait: [false, false], end: ['', ''], ...o });
+
+  if (order === 'same') return [
+    S(K.intro.same),
+    S(`${a.n}${a.s} ${ra}에 Lock을 걸었어요.`, { lk: [1, 0], prog: [1, 0], f: [0, 0] }),
+    S(`${b.n}${b.s} ${ra}를 요청했지만 Block이에요. 쥔 게 없어서 기다리기만 해요.`, { lk: [1, 0], prog: [1, 0], wait: [false, true], f: [1, 0] }),
+    S(`${a.n}${a.s} ${rb}에도 Lock을 걸었어요. ${b.n}${b.s} 계속 기다려요.`, { lk: [1, 1], prog: [2, 0], wait: [false, true], f: [0, 1] }),
+    S(`${a.n}${a.s} 일을 마치고 Lock을 모두 풀었어요. 기다리던 쪽이 갈 수 있어요.`, { prog: [2, 0], end: ['done', ''] }),
+    S(`${b.n}${b.s} ${ra}에 Lock을 걸었어요.`, { lk: [2, 0], prog: [2, 1], end: ['done', ''], f: [1, 0] }),
+    S(`${b.n}${b.s} ${rb}에도 Lock을 걸어 일을 해요.`, { lk: [2, 2], prog: [2, 2], end: ['done', ''], f: [1, 1] }),
+    S('같은 순서로 잡으면 기다리는 고리가 안 생겨요. 한쪽이 기다렸다가 차례로 끝났어요.', { prog: [2, 2], end: ['done', 'done'] }),
+  ];
+
+  // 서로 반대 순서: 여기까지는 cross, fix 공통
+  const base = [
+    S(K.intro.cross),
+    S(`${a.n}${a.s} ${ra}에 Lock을 걸어 혼자 쓰고 있어요.`, { lk: [1, 0], prog: [1, 0], f: [0, 0] }),
+    S(`${b.n}${b.s} ${rb}에 Lock을 걸었어요. 두 자원이 모두 잠겼어요.`, { lk: [1, 2], prog: [1, 1], f: [1, 0] }),
+    S(`${a.n}${a.s} ${rb}를 요청해요. ${b.n}${b.s} 쥐고 있어서 Block이에요.`, { lk: [1, 2], prog: [1, 1], wait: [true, false], f: [0, 1] }),
+    S(`${b.n}${b.s} ${ra}를 요청해요. 이쪽도 ${a.n}${a.s} 쥐고 있어서 Block이에요.`, { lk: [1, 2], prog: [1, 1], wait: [true, true], f: [1, 1] }),
+    S(`서로 상대가 쥔 것을 기다리며 자기 Lock은 놓지 않아요. 영원히 멈추는 ${K.dead}.`, { lk: [1, 2], prog: [1, 1], wait: [true, true] }),
+  ];
+  const dead = { lk: [1, 2], prog: [1, 1], wait: [true, true] };
+  if (kind === 'os' && order === 'cross') return [...base,
+    S('네 조건이 모두 성립했어요. 이 중 하나라도 깨면 교착상태는 생기지 않아요.', { ...dead, conds: true })];
+
+  // 풀어 주기: 고리를 찾고(탐지), 한쪽을 되돌려(회복) 다른 쪽이 끝까지 가게 한다
+  const detect = kind === 'os' ? `기다림이 ${a.k}, ${b.k}, ${a.k} 순으로 고리를 이뤄요. 이렇게 교착을 탐지해요.`
+    : `대기 관계에서 ${a.k}, ${b.k}, ${a.k} 고리(사이클)를 찾았어요. 데드락으로 판단해요.`;
+  const kill = kind === 'os' ? `${b.n}${b.o} 종료해서 쥐고 있던 ${rb}를 회수해요.`
+    : `희생자로 ${b.n}${b.o} 골라 ROLLBACK 해요. 쥐고 있던 ${rb}의 Lock이 풀려요.`;
+  const fin = kind === 'os' ? `${a.n}${a.s} ${rb}를 얻어 일을 마쳤어요. 교착이 풀렸어요.`
+    : `${a.n}${a.s} ${rb}의 Lock을 얻어 일을 마쳤어요. 데드락이 풀렸어요.`;
+  return [...base,
+    S(detect, { ...dead, cycle: true }),
+    S(kill, { lk: [1, 0], prog: [1, 1], wait: [true, false], end: ['', 'rb'], f: [1, 0] }),
+    S(fin, { prog: [2, 1], end: ['done', 'rb'], f: [0, 1] }),
+  ];
+}
+
+// 동작 한 줄의 상태: 쥠, Block, 예정, 풀림, 되돌림
+function actionState(s, t, j) {
+  if (s.end[t] === 'rb') return 'undo';
+  if (s.end[t] === 'done') return 'free';
+  if (j < s.prog[t]) return 'held';
+  return j === s.prog[t] && s.wait[t] ? 'wait' : 'todo';
+}
+
+// 그리기: 자원 카드 + 주체 카드 + 아래 상태 칸
+function render(s, stage) {
+  const K = KIND[s.kind], LABEL = { held: '쥐는 중', wait: 'Block, 기다림', todo: '아직', free: 'Unlock 완료', undo: K.undo };
+  const waitRes = t => (s.wait[t] ? s.plan[t][s.prog[t]] : -1);
+  const dead = s.wait[0] && s.wait[1];
+
+  const res = K.res.map((name, r) => {
+    const owner = s.lk[r], waiter = [0, 1].filter(t => waitRes(t) === r).map(t => K.th[t].k).join(', ');
+    return `<div class="rc${owner ? ' o' + owner : ''}${dead && owner ? ' bad' : ''}"><small>자원</small><b>${name}</b><em>쥔 쪽: ${owner ? K.th[owner - 1].k : '없음'}</em><em>기다림: ${waiter || '없음'}</em></div>`;
+  }).join('');
+
+  const who = [0, 1].map(t => {
+    const tag = s.end[t] === 'done' ? '끝남' : s.end[t] === 'rb' ? K.victim : s.wait[t] ? '대기 중' : s.prog[t] ? '진행 중' : '시작 전';
+    const rows = s.plan[t].map((r, j) => {
+      const st = actionState(s, t, j), now = s.f && s.f[0] === t && s.f[1] === j;
+      return `<span class="ac ${st}${now ? ' now sim-pop' : ''}"><b>${j + 1}. Lock(${K.res[r]})</b><small>${LABEL[st]}</small></span>`;
+    }).join('');
+    return `<div class="tc t${t + 1}"><header><b>${K.th[t].n}</b><span>${tag}</span></header>${rows}</div>`;
+  }).join('');
+
+  // 기다림 관계: 누가 누가 쥔 것을 기다리는지
+  const arrows = [0, 1].filter(t => waitRes(t) >= 0).map(t => `${K.th[t].k} → ${s.lk[waitRes(t)] ? K.th[s.lk[waitRes(t)] - 1].k : '빈 자원'}`).join(', ');
+  const all = s.end.every(e => e);
+  const pill = dead ? '<span class="pill bad">교착상태</span>' : all ? '<span class="pill ok">모두 끝남</span>' : `<span class="pill">${s.wait.some(Boolean) ? '일부 대기' : '진행 중'}</span>`;
+  const info = s.conds ? `<div class="cond">
+      <div><b>상호 배제</b><small>자원은 한 번에 한 쪽만 써요</small></div>
+      <div><b>점유 대기</b><small>쥔 채로 다른 자원을 기다려요</small></div>
+      <div><b>비선점</b><small>쥔 자원을 뺏을 수 없어요</small></div>
+      <div><b>순환 대기</b><small>${K.th[0].k}, ${K.th[1].k}, ${K.th[0].k} 고리예요</small></div></div>`
+    : `${pill}<span class="wf">${arrows ? `기다림: ${arrows}${s.cycle ? ' (고리)' : ''}` : '기다리는 쪽 없음'}</span>`;
+
+  stage.innerHTML = `<div class="res">${res}</div><div class="who${dead ? ' dead' : ''}">${who}</div><div class="foot${s.kind === 'os' ? ' os' : ''}">${info}</div>`;
+}
+
+// 직접 해 보기: 순서를 골라(목록 값만 받는다) 지금 모드로 다시 돌린다
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const err = document.getElementById('err'), order = e.target.order.value;
+  err.hidden = ['cross', 'same', 'fix'].includes(order);
+  if (!err.hidden) { err.textContent = '목록에서 순서를 골라 주세요.'; return; }
+  Sim.load(build(Sim.step().kind, order));
+  Sim.play(true);
+});
+
+Sim.start({ modes: { 'OS 스레드': build('os', 'cross'), 'DB 트랜잭션': build('db', 'fix') }, render });
+</script>
+</body>
+</html>

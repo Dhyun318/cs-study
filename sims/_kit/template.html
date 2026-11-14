@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시뮬레이션 이름</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 이 시뮬레이션 그림 전용 스타일. 색은 kit.css 변수만 쓴다 */
+.row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 48px 0; }
+.box { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid var(--grey-200); border-radius: 10px; font-size: 17px; font-weight: 700; }
+.box.hl { border-color: var(--blue); background: var(--blue-50); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>시뮬레이션 이름</h1>
+  </header>
+  <!-- 관련 질문: data-q = content 파일 이름/그 파일의 ### 질문 순번. 글자는 직접 지은 짧은 주제 이름 -->
+  <a class="sim-q" data-q="02-data-structure/1"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>주제 이름</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>무엇을 넣으면 무엇을 볼 수 있는지 한 문장.</p>
+    <div class="sim-row">
+      <input name="v" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" required placeholder="예: 7" aria-label="넣을 값(숫자)">
+      <button class="sim-btn">넣기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 단계: caption(한 줄 설명) + 그림에 필요한 값
+const STEPS = [
+  { caption: '처음 상태예요. 값 두 개가 들어 있어요.', items: [3, 5] },
+  { caption: '값 하나를 끝에 넣었어요.', items: [3, 5, 8], at: 2 },
+];
+
+// 그리기: 단계 하나를 stage에 그린다
+function render(s, stage) {
+  stage.innerHTML = `<div class="row">${s.items.map((n, i) => `<span class="box num${i === s.at ? ' hl sim-pop' : ''}">${n}</span>`).join('')}</div>`;
+}
+
+// 직접 해 보기: 지금 보이는 단계에서 이어지는 단계를 만들어 보여 준다
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const items = [...Sim.step().items, Number(e.target.v.value)];
+  Sim.load([{ caption: '입력한 값을 끝에 넣었어요.', items, at: items.length - 1 }]);
+  e.target.reset();
+});
+
+Sim.start({ steps: STEPS, render });
+</script>
+</body>
+</html>

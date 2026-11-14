@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가상 메모리와 page fault</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* CPU 줄: 지금 참조하는 페이지 + 상태 꼬리표 */
+.cpu { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.cpu > b { padding: 4px 10px; border-radius: 8px; background: var(--cta); color: #fff; font-size: 14px; }
+.cpu > span { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+.chip { flex: none; font-style: normal; padding: 4px 9px; border-radius: 999px; background: var(--grey-100); font-size: 13px; font-weight: 700; color: var(--grey-800); }
+.chip.ok { background: var(--blue-50); color: var(--accent-text); }
+.chip.bad { background: var(--red-50); color: var(--red); }
+
+/* 구역 제목 + 표(왼쪽 줄 이름, 오른쪽 페이지 6칸) */
+.sec { margin: 12px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.g { display: grid; grid-template-columns: 52px repeat(6, minmax(0, 1fr)); gap: 4px; align-items: center; margin-bottom: 4px; }
+.rl { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.c { height: 30px; display: grid; place-items: center; border: 1px solid var(--grey-200); border-radius: 6px; font-size: 14px; font-weight: 700; }
+.c.h { border-color: transparent; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.c.e { border-style: dashed; color: var(--ink-2); font-weight: 500; }
+.c.hl { border-color: var(--blue); background: var(--blue-50); color: var(--accent-text); }
+.c.bad { border-color: var(--red); background: var(--red-50); color: var(--red); }
+
+/* 직접 해 보기 선택 칸: input과 같은 모양 */
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-row select:focus { border-color: var(--accent-text); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>가상 메모리와 page fault</h1>
+  </header>
+  <a class="sim-q" data-q="03-os/10"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 1개">1</span>가상 메모리와 swap</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>CPU가 참조할 페이지를 골라 보세요. RAM에 없으면 page fault가 나고, 한 번 올린 페이지는 다시 고르면 바로 적중해요.</p>
+    <div class="sim-row">
+      <select name="p" required aria-label="참조할 페이지"></select>
+      <button class="sim-btn">참조하기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시: 프로그램 페이지 6개, RAM frame 6개. m[페이지] = 들어 있는 frame 번호, 없으면 null(유효 비트 0)
+// 페이지 수와 frame 수가 같아서 빈 frame이 모자랄 일이 없다(교체는 이 시뮬레이션 범위 밖)
+const N = 6;
+const S0 = [null, 4, null, 1, 5, null];
+const freeFrame = m => [...Array(N).keys()].find(f => !m.includes(f));
+
+// 단계 하나: m = 이 순간의 page table. ref = 참조 중인 페이지, 나머지는 강조 표시
+const step = (m, caption, o = {}) => ({ m, caption, ...o });
+
+// 페이지 n 참조 한 번: 적중이면 2단계, page fault면 6단계. 마지막 단계의 m이 처리 끝난 상태
+function refSteps(m, n) {
+  const look = step(m, `CPU가 ${n}번 페이지를 참조해요. 먼저 page table에서 그 줄을 봐요.`, { ref: n, st: '확인 중' });
+  if (m[n] !== null) return [look, step(m, `유효 비트가 켜져 있어요. RAM ${m[n]}번 frame에서 바로 접근해요.`, { ref: n, hit: true, st: '적중', tone: 'ok' })];
+  const g = freeFrame(m), m2 = m.map((f, p) => (p === n ? g : f));
+  return [look,
+    step(m, `${n}번 줄의 유효 비트가 꺼져 있어요. RAM에 없다는 뜻이에요.`, { ref: n, bad: true, st: '무효', tone: 'bad' }),
+    step(m, 'page fault trap이 발생해요. CPU는 멈추고 OS가 넘겨받아요.', { ref: n, bad: true, st: 'page fault', tone: 'bad' }),
+    step(m, `OS가 swap의 ${n}번 페이지를 빈 ${g}번 frame에 읽어 와요. 디스크라 느려요.`, { ref: n, load: { p: n, f: g }, st: 'OS가 적재 중', tone: 'ok' }),
+    step(m2, `page table을 고쳐요. ${n}번 줄이 유효 1, ${g}번 frame이 됐어요.`, { ref: n, upd: true, st: 'table 갱신', tone: 'ok' }),
+    step(m2, `멈췄던 명령을 다시 실행해요. 이번에는 ${g}번 frame에서 읽혀요.`, { ref: n, hit: true, st: '재시작 성공', tone: 'ok' })];
+}
+
+// 기본 흐름: 적중 한 번, fault 한 번, 방금 올린 페이지 다시 참조
+const hitFirst = refSteps(S0, 4), fault = refSteps(S0, 2), after = fault.at(-1).m;
+const again = refSteps(after, 2);
+again[0].caption = '아까 올린 2번 페이지를 다시 참조해요. page table 줄을 봐요.';
+again[1].caption = '이제 유효 비트가 켜져 있어요. fault 없이 바로 적중이에요.';
+const STEPS = [
+  step(S0, '프로그램 페이지는 0번부터 5번까지예요. 지금 RAM에는 1, 3, 4번만 올라와 있고 나머지는 swap에 있어요.'),
+  ...hitFirst, ...fault, ...again,
+];
+
+// 칸 하나를 만든다
+const cell = (txt, cls = '') => `<span class="c num ${cls}">${txt}</span>`;
+const row = (label, cells) => `<div class="g"><span class="rl">${label}</span>${cells.join('')}</div>`;
+const pages = [...Array(N).keys()];
+
+// 그리기: CPU 줄 + page table + RAM + swap
+function render(s, stage) {
+  const frames = Array(N).fill(null);
+  s.m.forEach((f, p) => { if (f !== null) frames[f] = p; });
+  if (s.load) frames[s.load.f] = s.load.p; // 적재 중인 페이지는 table 갱신 전이라도 RAM에 보인다
+  const inRef = p => p === s.ref;
+  const popFrame = s.hit ? s.m[s.ref] : s.load?.f;
+  stage.innerHTML = `
+    <div class="cpu"><b>CPU</b><span class="num">${s.ref === undefined ? '대기 중' : `참조: ${s.ref}번 페이지`}</span>${s.st ? `<em class="chip ${s.tone || ''}">${s.st}</em>` : ''}</div>
+    <p class="sec">page table (유효 1은 RAM에 있다는 뜻)</p>
+    ${row('페이지', pages.map(p => cell(p, 'h' + (inRef(p) ? ' hl' : ''))))}
+    ${row('유효', pages.map(p => cell(s.m[p] === null ? 0 : 1, (inRef(p) ? (s.bad ? 'bad' : 'hl') : '') + (inRef(p) && s.upd ? ' sim-pop' : ''))))}
+    ${row('frame', pages.map(p => cell(s.m[p] === null ? '-' : s.m[p], (inRef(p) ? (s.bad ? 'bad' : 'hl') : '') + (inRef(p) && s.upd ? ' sim-pop' : ''))))}
+    <p class="sec">RAM (frame 6개)</p>
+    ${row('frame', pages.map(f => cell(f, 'h')))}
+    ${row('페이지', pages.map(f => cell(frames[f] ?? '빈', frames[f] === null ? 'e' : f === popFrame ? 'hl sim-pop' : '')))}
+    <p class="sec">swap 영역 (디스크)</p>
+    ${row('페이지', pages.map(p => (s.m[p] === null ? cell(p, s.load?.p === p ? 'hl' : '') : cell('', 'e'))))}`;
+}
+
+// 직접 해 보기: 지금 page table에서 고른 페이지를 참조하는 단계를 만들어 자동 재생
+const sel = document.querySelector('#try select');
+sel.innerHTML = '<option value="">페이지 고르기</option>' + pages.map(p => `<option value="${p}">${p}번 페이지</option>`).join('');
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const n = Number(sel.value);
+  if (sel.value === '' || !Number.isInteger(n) || n < 0 || n >= N) return;
+  Sim.load(refSteps(Sim.step().m, n));
+  Sim.play(true);
+  sel.value = '';
+});
+
+Sim.start({ steps: STEPS, render });
+</script>
+</body>
+</html>

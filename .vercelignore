@@ -1,0 +1,9 @@
+# 버셀은 scripts/build.py 로 app/ 을 만든다. 빌드에 필요 없는 것은 올리지 않는다
+_reference/
+design/
+docs/
+graphify-out/
+.omc/
+.claude/
+*.pdf
+app/CLAUDE.md

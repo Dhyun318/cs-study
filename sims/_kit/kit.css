@@ -1,0 +1,88 @@
+/* 시뮬레이션 공통 스타일. 색과 글꼴은 design/o/landing.html(오픽 토큰)과 같다 */
+:root {
+  --bg: #FFFFFF; --canvas: #F2F3F5; --line: #EAEBEE;
+  --ink: #202020; --ink-2: #5C5F66; --mute: #8B95A1; --chev: #A3A8B0;
+  --blue: #6194F8; --accent-text: #0E5CF4; --cta: #03257B; --blue-50: #e8f3ff;
+  --grey-100: #f2f4f6; --grey-200: #e5e8eb; --grey-700: #4e5968; --grey-800: #333d4b; --grey-900: #191f28;
+  --orange-100: #ffe0b0;
+  --red: #C62828; --red-50: #FDECEC; /* 충돌, 잘못된 입력 표시에만 쓴다 */
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  color: var(--ink);
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+body { margin: 0; min-width: 320px; background: var(--canvas); letter-spacing: -0.01em; }
+@media (min-width: 431px) { body { background: #DADDE3; } }
+a { color: inherit; text-decoration: none; }
+h1, h2, p { margin: 0; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* 페이지: 모바일 폭 한 줄 */
+.sim-page { max-width: 430px; min-height: 100dvh; margin: 0 auto; padding-bottom: 32px; background: var(--canvas); }
+
+/* 위 막대: 목록으로 + 제목 */
+.sim-top { height: 48px; display: flex; align-items: center; gap: 2px; padding: 0 16px 0 6px; }
+.sim-top h1 { min-width: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sim-back { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; color: var(--grey-800); }
+.sim-back::before { content: ""; width: 24px; height: 24px; background: currentColor; -webkit-mask: var(--i-back) center / contain no-repeat; mask: var(--i-back) center / contain no-repeat; }
+
+/* 관련 질문 줄: 별 꼬리표 + 질문 이름 + 오른쪽 화살표 */
+.sim-q { display: flex; align-items: center; gap: 12px; margin: 0 12px; padding: 14px 16px 14px 20px; border-radius: 20px; background: var(--bg); transition: background-color .12s; }
+.sim-q:active { background: var(--grey-100); }
+.sim-q > span { flex: 1; min-width: 0; }
+.sim-q small { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.sim-q b { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 4px; font-size: 16px; font-weight: 600; line-height: 1.45; letter-spacing: -0.02em; }
+.sim-q::after { content: ""; flex: none; width: 16px; height: 16px; background: var(--chev); -webkit-mask: var(--i-chev) center / contain no-repeat; mask: var(--i-chev) center / contain no-repeat; }
+
+/* 빈출 꼬리표: 주황 바탕 + 진한 글자 (글자는 별 개수) */
+.sim-star { display: inline-flex; align-items: center; gap: 2px; height: 20px; padding: 0 5px; margin-right: 6px; border-radius: 4px; background: var(--orange-100); color: var(--grey-900); font-size: 13px; font-weight: 700; vertical-align: 2px; font-variant-numeric: tabular-nums; }
+.sim-star::before { content: ""; width: 12px; height: 12px; background: currentColor; -webkit-mask: var(--i-star) center / contain no-repeat; mask: var(--i-star) center / contain no-repeat; }
+
+/* 시뮬레이션 묶음: 모드 탭, 그림, 단계 설명, 버튼이 한 장에 */
+.sim-card { margin: 12px 12px 0; padding: 12px; border-radius: 20px; background: var(--bg); }
+.sim-tabs { display: flex; gap: 4px; padding: 4px; margin-bottom: 12px; border-radius: 12px; background: var(--grey-100); }
+.sim-tabs button { flex: 1; height: 36px; border: 0; border-radius: 9px; background: none; font-size: 15px; font-weight: 600; color: var(--ink-2); }
+.sim-tabs [aria-pressed="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.sim-stage { min-height: 160px; }
+
+/* 단계 번호 + 한 줄 설명 */
+.sim-say { min-height: 68px; margin-top: 12px; padding: 11px 14px; border-radius: 14px; background: var(--grey-100); font-size: 15px; font-weight: 500; line-height: 1.5; color: var(--grey-900); text-wrap: pretty; }
+.sim-count { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; background: var(--bg); font-size: 13px; font-weight: 700; line-height: 22px; color: var(--accent-text); vertical-align: 1px; }
+
+/* 이전 / 재생 / 다음 */
+.sim-ctrl { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 8px; margin-top: 12px; }
+.sim-ctrl button { height: 52px; display: flex; align-items: center; justify-content: center; gap: 4px; border: 0; border-radius: 14px; background: var(--grey-100); font-size: 16px; font-weight: 700; color: var(--grey-800); transition: transform .12s; }
+.sim-ctrl button:active { transform: scale(.97); }
+.sim-ctrl .main { background: var(--cta); color: #fff; }
+.sim-ctrl button:disabled { color: #B0B8C1; cursor: default; transform: none; }
+.sim-ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 직접 해 보기: 입력 한 줄 + 버튼 */
+.sim-try { margin: 12px 12px 0; padding: 18px 16px 16px; border-radius: 20px; background: var(--bg); }
+.sim-try h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.sim-try p { margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.sim-row { display: flex; gap: 8px; margin-top: 12px; }
+.sim-row input { flex: 1; min-width: 0; height: 48px; padding: 0 14px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; font-variant-numeric: tabular-nums; }
+.sim-row input::placeholder { color: var(--ink-2); }
+.sim-row input:focus { border-color: var(--accent-text); }
+.sim-btn { flex: none; height: 48px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--cta); color: #fff; font-size: 15px; font-weight: 700; }
+.sim-btn.ghost { background: var(--grey-100); color: var(--grey-800); }
+
+/* 그림 안에서 같이 쓰는 표시: 방금 들어온 것 */
+.sim-pop { animation: sim-pop .35s ease-out; }
+@keyframes sim-pop { from { transform: scale(.88); opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* 아이콘: Tabler chevron-left, TDS chevron/star (design/o와 같은 모양) */
+:root {
+  --i-back: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M15 6l-6 6l6 6'/></svg>");
+  --i-chev: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='m5.75 13.4c-.23 0-.46-.09-.64-.26a.9.9 0 0 1 0-1.27l3.87-3.87-3.87-3.86a.9.9 0 0 1 0-1.27.9.9 0 0 1 1.27 0l4.5 4.5a.9.9 0 0 1 0 1.27l-4.5 4.5c-.17.17-.4.26-.63.26'/></svg>");
+  --i-star: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='m13.154 1.927 2.327 4.715c.187.379.549.642.968.703l5.203.756c1.054.153 1.476 1.45.712 2.193l-3.765 3.67a1.287 1.287 0 0 0 -.37 1.138l.889 5.182c.18 1.051-.922 1.851-1.865 1.356l-4.654-2.447a1.284 1.284 0 0 0 -1.196 0l-4.654 2.447c-.944.495-2.046-.305-1.866-1.356l.889-5.182a1.288 1.288 0 0 0 -.37-1.138l-3.765-3.67c-.763-.743-.342-2.04.713-2.193l5.202-.756c.419-.061.782-.324.969-.703l2.326-4.715c.472-.956 1.835-.956 2.307 0'/></svg>");
+}

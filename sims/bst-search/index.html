@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BST 키 검색</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위 줄: 찾는 key, 비교 횟수, 이번 비교식 */
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 32px; }
+.chip { padding: 4px 10px; border-radius: 8px; background: var(--grey-100); font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.chip b { color: var(--ink); }
+.cmp { margin-left: auto; font-size: 15px; font-weight: 700; color: var(--accent-text); }
+
+/* 트리 그림: SVG 하나. 칸 높이를 고정해서 모드를 바꿔도 아래 설명이 움직이지 않는다 */
+.tree { min-height: 300px; margin-top: 4px; }
+.tree svg { display: block; width: 100%; height: auto; }
+.ed { stroke: var(--chev); stroke-width: 1.5; }
+.ed.on { stroke: var(--blue); stroke-width: 3; }
+.ed.nil { stroke: var(--mute); stroke-dasharray: 4 3; }
+.nd circle { fill: var(--bg); stroke: var(--chev); stroke-width: 1.5; }
+.nd text { font-size: 14px; font-weight: 700; text-anchor: middle; dominant-baseline: central; fill: var(--ink); font-variant-numeric: tabular-nums; }
+.nd.seen circle { fill: var(--blue-50); stroke: var(--blue); stroke-width: 2; }
+.nd.cur circle { fill: var(--accent-text); stroke: var(--accent-text); }
+.nd.ok circle { fill: var(--cta); stroke: var(--cta); }
+.nd.cur text, .nd.ok text { fill: #fff; }
+.nd.cur, .nd.ok { transform-box: fill-box; transform-origin: center; }
+.nl circle { fill: var(--bg); stroke: var(--mute); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.nl text { font-size: 12px; font-weight: 600; text-anchor: middle; dominant-baseline: central; fill: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>BST 키 검색</h1>
+  </header>
+  <a class="sim-q" data-q="02-data-structure/10"><span><small>관련 질문</small><b><span class="sim-star" aria-label="별 2개">2</span>BST 규칙과 검색 비용</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>찾을 숫자(0~99)를 넣으면 지금 트리에서 비교하며 찾아요. 탭을 바꿔 같은 숫자의 비교 횟수를 견줘 봐요. 트리에 든 값: 14, 28, 40, 52, 63, 75, 90.</p>
+    <div class="sim-row">
+      <input name="key" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" required placeholder="예: 75" aria-label="찾을 key(0부터 99까지 숫자)">
+      <button class="sim-btn">찾기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 값 7개. 균형 트리는 52, 28, 75, 14, 40, 63, 90 순서로, 치우친 트리는 작은 것부터 넣어 만든다
+const SORTED = [14, 28, 40, 52, 63, 75, 90];
+const BAL_ORDER = [52, 28, 75, 14, 40, 63, 90];
+const R = 16; // 노드 반지름
+const BAL_POS = { 52: [150, 36], 28: [75, 128], 75: [225, 128], 14: [38, 220], 40: [113, 220], 63: [188, 220], 90: [263, 220] };
+const CHAIN_POS = Object.fromEntries(SORTED.map((v, i) => [v, [36 + 38 * i, 24 + 36 * i]]));
+
+// 값을 순서대로 BST 규칙에 맞게 넣어 트리를 만든다. h = 높이(층 수)
+function build(order, pos) {
+  const nodes = {};
+  let root = null;
+  order.forEach(v => {
+    nodes[v] = { v, x: pos[v][0], y: pos[v][1], l: null, r: null };
+    if (root === null) { root = v; return; }
+    let c = nodes[root];
+    while (true) {
+      const side = v < c.v ? 'l' : 'r';
+      if (c[side] === null) { c[side] = v; break; }
+      c = nodes[c[side]];
+    }
+  });
+  const ht = v => v === null ? 0 : 1 + Math.max(ht(nodes[v].l), ht(nodes[v].r));
+  return { nodes, root, h: ht(root) };
+}
+const BAL = build(BAL_ORDER, BAL_POS);
+const CHAIN = build(SORTED, CHAIN_POS);
+BAL.kind = '균형'; CHAIN.kind = '치우침';
+
+// key를 찾아 내려가는 단계 만들기: 노드마다 비교 한 단계, 끝에 정리 한 단계 (intro가 있으면 맨 앞에 설명 단계)
+function search(tree, K, intro) {
+  const steps = [], path = [];
+  const base = { tree, key: K };
+  if (intro) steps.push({ ...base, caption: intro, path: [], cur: null, count: 0, cmp: '' });
+  let v = tree.root, count = 0, hit = null, nil = null;
+  while (v !== null) {
+    count++;
+    const n = tree.nodes[v];
+    const pre = count === 1 ? '루트와 비교해요. ' : '다음 노드와 비교해요. ';
+    const rel = K === v ? '=' : K < v ? '&lt;' : '&gt;';
+    const caption = K === v ? `${pre}같아요! 비교 ${count}번 만에 찾았어요.`
+      : K < v ? `${pre}key가 더 작으니 왼쪽으로 내려가요.` : `${pre}key가 더 크니 오른쪽으로 내려가요.`;
+    steps.push({ ...base, caption, path: [...path], cur: v, hit: K === v ? v : null, count, cmp: `${K} ${rel} ${v}` });
+    if (K === v) { hit = v; break; }
+    path.push(v);
+    const side = K < v ? 'l' : 'r';
+    if (n[side] === null) {
+      nil = { p: v, side };
+      steps.push({ ...base, caption: '내려갈 자식이 없어요. 빈 자리라서 이 key는 트리에 없어요.', path: [...path], cur: null, nil, count, cmp: '' });
+      break;
+    }
+    v = n[side];
+  }
+  const tail = tree.kind === '치우침' ? '값 수에 비례해 O(n)이에요.' : '절반씩 줄어 O(log n)이에요.';
+  steps.push({ ...base, caption: hit !== null ? `높이 ${tree.h}층이라 최대 ${tree.h}번 비교해요. ${tail}` : `비교 ${count}번 해 보고 없다는 걸 알았어요. 최대 ${tree.h}번이면 돼요.`,
+    path, cur: null, hit, nil, count, cmp: '' });
+  return steps;
+}
+
+const KEY = 63;
+const BAL_STEPS = search(BAL, KEY, '어느 노드든 왼쪽은 작은 값, 오른쪽은 큰 값이에요. 이 트리에서 찾아볼게요.');
+const CHAIN_STEPS = search(CHAIN, KEY, '같은 값들을 작은 순서로 넣으면 오른쪽으로만 이어져요. 같은 key를 찾아볼게요.');
+
+// 그리기: 위 줄(key, 횟수, 비교식) + 트리 SVG
+function render(s, stage) {
+  const t = s.tree, nodes = Object.values(t.nodes);
+  const seen = new Set(s.path);
+  const visited = v => seen.has(v) || v === s.cur || v === s.hit;
+  const edge = (a, b, cls) => `<line class="ed${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+  let lines = '';
+  nodes.forEach(n => ['l', 'r'].forEach(side => {
+    const c = n[side] === null ? null : t.nodes[n[side]];
+    if (c) lines += edge(n, c, visited(n.v) && visited(c.v) ? ' on' : '');
+  }));
+  // 빈 자리: 마지막 노드 아래에 점선 원
+  let ghost = '';
+  if (s.nil) {
+    const p = t.nodes[s.nil.p], g = { x: p.x + (s.nil.side === 'l' ? -22 : 22), y: p.y + 44 };
+    ghost = edge(p, g, ' nil') + `<g class="nl sim-pop"><circle cx="${g.x}" cy="${g.y}" r="13"/><text x="${g.x}" y="${g.y}">빈</text></g>`;
+  }
+  const circles = nodes.map(n => {
+    const st = n.v === s.hit ? ' ok' : n.v === s.cur ? ' cur' : seen.has(n.v) ? ' seen' : '';
+    return `<g class="nd${st}${n.v === s.cur ? ' sim-pop' : ''}"><circle cx="${n.x}" cy="${n.y}" r="${R}"/><text x="${n.x}" y="${n.y}">${n.v}</text></g>`;
+  }).join('');
+  stage.innerHTML = `
+    <div class="bar"><span class="chip">찾는 key <b class="num">${s.key}</b></span><span class="chip">비교 <b class="num">${s.count}</b>번</span><span class="cmp num">${s.cmp}</span></div>
+    <div class="tree"><svg viewBox="0 0 300 300" role="img" aria-label="이진 탐색 트리">${lines}${ghost}${circles}</svg></div>`;
+}
+
+// 직접 해 보기: 지금 보이는 트리에서 입력한 key를 찾는 단계를 만들어 자동 재생
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const K = Number(e.target.key.value);
+  if (!Number.isInteger(K) || K < 0 || K > 99) return;
+  Sim.load(search(Sim.step().tree, K));
+  Sim.play(true);
+  e.target.reset();
+});
+
+Sim.start({ modes: { 균형: BAL_STEPS, 치우침: CHAIN_STEPS }, render });
+</script>
+</body>
+</html>

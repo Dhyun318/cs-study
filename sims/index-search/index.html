@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Index 검색 경로</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 찾는 조건 한 줄 */
+.cond { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: var(--grey-100); font-size: 13px; }
+.cond small { flex: none; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.cond b { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+
+/* 읽은 칸 수 꼬리표 */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; margin: 8px 0; }
+.chips span { padding: 3px 9px; border-radius: 8px; border: 1px solid var(--grey-200); font-size: 13px; color: var(--ink-2); }
+.chips b { margin-left: 4px; color: var(--accent-text); }
+
+/* 직접 해 보기: 이름 고르기 (input과 같은 모양) */
+.sim-sel { flex: 1; min-width: 0; height: 48px; padding: 0 12px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-sel:focus { border-color: var(--accent-text); }
+
+/* 왼쪽 index, 오른쪽 표 */
+.two { display: grid; grid-template-columns: 5fr 7fr; gap: 10px; }
+.two.solo { grid-template-columns: 1fr; }
+.pn { display: grid; gap: 3px; align-content: start; min-width: 0; }
+.pt { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.r { display: grid; align-items: center; gap: 4px; height: 28px; padding: 0 6px; border: 1px solid var(--grey-200); border-radius: 8px; font-size: 13px; }
+.r.head { height: 20px; border: 0; padding-top: 0; font-size: 11px; font-weight: 600; color: var(--mute); }
+.ix { grid-template-columns: 1fr auto; }
+.ix span + span { color: var(--accent-text); font-weight: 700; }
+.tb { grid-template-columns: 24px 44px 1fr 32px; }
+.solo .tb { grid-template-columns: 40px 1fr 1fr 1fr; }
+.tb span:first-child { color: var(--ink-2); }
+.r.seen { background: var(--grey-100); }
+.r.hl { border-color: var(--blue); background: var(--blue-50); font-weight: 700; }
+.r.out { border-color: transparent; color: var(--mute); }
+.r.out span + span { color: var(--mute); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Index 검색 경로</h1>
+  </header>
+  <a class="sim-q" data-q="04-database/7"><span><small>관련 질문</small><b>Index를 쓰는 이유</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>찾을 이름을 고르면 지금 보는 방식으로 그 이름을 찾아요. 끝에서 읽은 칸 수를 비교해요.</p>
+    <div class="sim-row">
+      <select class="sim-sel" name="name" required aria-label="찾을 이름"></select>
+      <button class="sim-btn">찾기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 표: [회원번호, 이름, 등급]. 행 번호는 저장된 순서(1부터)
+const ROWS = [
+  [5101, '한서윤', '일반'], [5102, '오지후', '실버'], [5103, '문하늘', '일반'], [5104, '임도윤', '골드'],
+  [5105, '최예린', '일반'], [5106, '서민재', '실버'], [5107, '장유나', '일반'], [5108, '백승우', '골드'],
+];
+const N = ROWS.length;
+// index: 이름을 가나다순으로 정렬하고 행 번호(pointer)를 붙인다 (한글 글자 코드는 가나다 순서라 기본 정렬로 충분)
+const SORTED = ROWS.map(([, name], p) => ({ name, row: p + 1 })).sort((a, b) => (a.name < b.name ? -1 : 1));
+const NAMES = SORTED.map(e => e.name);
+const FIRST = '임도윤';
+
+// 이분 탐색: 남은 범위의 가운데 칸을 차례로 확인한 기록
+function probes(name) {
+  const out = [];
+  let lo = 0, hi = N - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    out.push({ lo, hi, mid });
+    if (SORTED[mid].name === name) break;
+    if (SORTED[mid].name < name) lo = mid + 1; else hi = mid - 1;
+  }
+  return out;
+}
+
+const upTo = n => Array.from({ length: n }, (_, i) => i);
+const cmpCaption = k => `읽은 칸을 세면 index 방식은 ${k + 1}칸, 전체 훑기는 ${N}칸이에요.`;
+
+// index 없이: 첫 행부터 끝 행까지 모두 읽는다 (이름이 겹칠 수 있어서)
+function scanSteps(name) {
+  const p = NAMES.includes(name) ? ROWS.findIndex(r => r[1] === name) : 0;
+  const k = probes(name).length;
+  const base = { mode: 'scan', name, k };
+  const others = upTo(N).filter(i => i !== p);
+  return [
+    { ...base, caption: 'index가 없으면 표를 맨 위 행부터 하나씩 읽어요.', seen: [], hl: -1, nTb: 0 },
+    ...upTo(p + 1).map(i => ({
+      ...base, seen: upTo(i), hl: i, nTb: i + 1,
+      caption: i === p ? `${i + 1}번 행을 읽으니 찾던 이름이에요. 하지만 여기서 멈출 수 없어요.` : `${i + 1}번 행을 읽었어요. 이름이 달라서 다음 행으로 가요.`,
+    })),
+    ...(p < N - 1 ? [{ ...base, caption: '같은 이름이 더 있을 수 있어서 남은 행도 끝까지 읽어요.', seen: others, hl: p, nTb: N }] : []),
+    { ...base, caption: cmpCaption(k), seen: others, hl: p, nTb: N, cmp: true },
+  ];
+}
+
+// index로: 정렬된 index에서 범위를 반씩 줄이며 찾고, pointer가 가리키는 행으로 간다
+function indexSteps(name) {
+  const ps = probes(name), k = ps.length, last = ps[k - 1];
+  const row = SORTED[last.mid].row, p = row - 1;
+  const base = { mode: 'index', name, seen: [] };
+  const lead = { ...base, ix: { lo: last.lo, hi: last.hi, hl: last.mid }, nIx: k };
+  return [
+    { ...base, caption: 'index는 이름을 가나다순으로 정리하고 행 위치(pointer)를 붙여 둔 작은 표예요.', ix: { lo: 0, hi: N - 1, hl: -1 }, hl: -1, nIx: 0, nTb: 0 },
+    ...ps.map((pr, j) => {
+      const at = SORTED[pr.mid].name, who = j ? '남은 칸의 가운데' : '가운데 칸';
+      const before = at < name;
+      return {
+        ...base, ix: { lo: pr.lo, hi: pr.hi, hl: pr.mid }, hl: -1, nIx: j + 1, nTb: 0,
+        caption: at === name
+          ? `${who}가 찾던 이름이에요. 옆의 pointer는 ${row}번 행이에요.`
+          : `${who} 이름은 ${at}. 찾는 이름보다 ${before ? '앞이라 아래쪽' : '뒤라 위쪽'} 절반만 남겨요.`,
+      };
+    }),
+    { ...lead, caption: `pointer를 따라 표의 ${row}번 행으로 바로 가요. 다른 행은 읽지 않아요.`, hl: p, nTb: 1 },
+    { ...lead, caption: cmpCaption(k), hl: p, nTb: 1, cmp: true },
+  ];
+}
+
+// 읽은 칸 수 꼬리표
+function chips(s) {
+  const c = (label, n) => `<span>${label}<b class="num">${n}칸</b></span>`;
+  if (s.mode === 'scan') return s.cmp ? c('전체 훑기', s.nTb) + c('index 방식', s.k + 1) : c('표에서 읽음', s.nTb);
+  return s.cmp ? c('index 방식', s.nIx + 1) + c('전체 훑기', N) : c('index에서 읽음', s.nIx) + c('표에서 읽음', s.nTb);
+}
+
+// 그리기: 찾는 조건, 읽은 칸 수, (index) + 표
+function render(s, stage) {
+  const table = `<div class="pn"><span class="pt">member 표</span>
+    <div class="r head tb"><span>행</span><span>회원번호</span><span>이름</span><span>등급</span></div>
+    ${ROWS.map(([id, nm, grade], p) => `<div class="r tb${s.seen.includes(p) ? ' seen' : ''}${s.hl === p ? ' hl sim-pop' : ''}"><span class="num">${p + 1}</span><span class="num">${id}</span><span>${nm}</span><span>${grade}</span></div>`).join('')}</div>`;
+  const index = s.mode === 'index' ? `<div class="pn"><span class="pt">index</span>
+    <div class="r head ix"><span>search-key</span><span>pointer</span></div>
+    ${SORTED.map((e, j) => `<div class="r ix${j < s.ix.lo || j > s.ix.hi ? ' out' : ''}${s.ix.hl === j ? ' hl sim-pop' : ''}"><span>${e.name}</span><span class="num">→ ${e.row}</span></div>`).join('')}</div>` : '';
+  stage.innerHTML = `
+    <div class="cond"><small>찾는 조건</small><b>name = '${s.name}'</b></div>
+    <div class="chips">${chips(s)}</div>
+    <div class="two${s.mode === 'scan' ? ' solo' : ''}">${index}${table}</div>`;
+}
+
+// 직접 해 보기: 고른 이름을 지금 보는 방식으로 찾는 단계를 만들어 자동 재생
+const sel = document.querySelector('#try select');
+sel.innerHTML = NAMES.map(n => `<option>${n}</option>`).join('');
+sel.value = FIRST;
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = e.target.name.value;
+  if (!NAMES.includes(name)) return;
+  const scan = document.querySelector('.sim-tabs [aria-pressed=true]').textContent === 'index 없이';
+  Sim.load((scan ? scanSteps : indexSteps)(name));
+  Sim.play(true);
+});
+
+Sim.start({ modes: { 'index 없이': scanSteps(FIRST), 'index로': indexSteps(FIRST) }, render });
+</script>
+</body>
+</html>

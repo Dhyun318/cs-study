@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCP 연결 맺기와 끊기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위쪽: 클라이언트와 서버 상자 (상태 이름이 바뀌는 곳) */
+.hosts { display: flex; justify-content: space-between; }
+.host { width: 108px; display: grid; justify-items: center; gap: 3px; padding: 8px 2px; border: 1px solid var(--grey-200); border-radius: 12px; }
+.host .sim-ic { width: 24px; height: 24px; color: var(--grey-700); }
+.host b { font-size: 13px; }
+.st { display: block; max-width: 100%; padding: 2px 4px; border-radius: 6px; background: var(--grey-100); font-size: 11px; font-weight: 700; line-height: 16px; color: var(--grey-800); text-align: center; overflow-wrap: anywhere; }
+.st.on { background: var(--blue-50); color: var(--accent-text); }
+
+/* 아래쪽: 점선 두 개(양쪽 생명선) 사이를 메시지 화살표가 오간다 */
+.wire { position: relative; padding-top: 6px; }
+.wire::before, .wire::after { content: ""; position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--grey-200); }
+.wire::before { left: 53px; }
+.wire::after { right: 54px; }
+.msg { height: 58px; margin: 0 54px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 7px; padding-bottom: 7px; color: var(--mute); }
+.msg.off { visibility: hidden; }
+.lbl { position: relative; z-index: 1; display: grid; justify-items: center; padding: 2px 8px; border: 1px solid transparent; border-radius: 8px; background: var(--grey-100); color: var(--grey-800); line-height: 1.25; }
+.lbl b { font-size: 13px; }
+.lbl small { font-size: 11px; font-weight: 600; color: var(--ink-2); }
+.ar { position: relative; width: 100%; height: 2px; background: currentColor; }
+.ar::before, .ar::after { content: ""; position: absolute; top: -4px; display: none; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+.r .ar::after, .b .ar::after { display: block; right: -1px; border-left: 8px solid currentColor; }
+.l .ar::before, .b .ar::before { display: block; left: -1px; border-right: 8px solid currentColor; }
+.msg.cur { color: var(--blue); }
+.msg.cur .lbl { border-color: var(--blue); background: var(--blue-50); }
+.msg.cur .lbl small { color: var(--accent-text); }
+
+/* 직접 해 보기 */
+.sim-try .f { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.sim-try .f small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.sim-row .sim-btn { flex: 1; }
+.err { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--red); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>TCP 연결 맺기와 끊기</h1>
+  </header>
+  <a class="sim-q" data-q="05-network/3"><span><small>관련 질문</small><b>TCP 연결 맺기, 3-way handshake</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try" novalidate>
+    <h2>직접 해 보기</h2>
+    <p>연결 수립에서 두 쪽의 시작 번호를 넣어 보세요. 번호에 따라 ACK 번호가 어떻게 달라지는지 보여 줘요.</p>
+    <div class="sim-row">
+      <label class="f"><small>클라이언트 시작 번호</small><input name="x" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" required placeholder="예: 100" aria-label="클라이언트 시작 번호(0부터 999)"></label>
+      <label class="f"><small>서버 시작 번호</small><input name="y" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" required placeholder="예: 300" aria-label="서버 시작 번호(0부터 999)"></label>
+    </div>
+    <div class="sim-row">
+      <button class="sim-btn">보여 주기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="err" id="err" role="alert" hidden></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 상태 이름 중 ESTABLISHED는 연결된 상태라 파랑으로 보여 준다
+const CONNECTED = 'ESTABLISHED';
+
+// 단계 목록 만들기: 표 한 줄 = [설명, 보이는 화살표 수, 클라이언트 상태, 서버 상태]
+function mk(kind, rows, table) {
+  return table.map(([caption, shown, cs, ss], i, all) => ({
+    kind, rows, caption, shown, cs, ss,
+    // 앞 단계와 달라진 상태 상자는 강조한다
+    changed: { c: i > 0 && all[i - 1][2] !== cs, s: i > 0 && all[i - 1][3] !== ss },
+  }));
+}
+
+// 연결 수립(3-way): 클라이언트 시작 번호 x, 서버 시작 번호 y. ACK 번호는 상대 번호 + 1
+function open(x, y) {
+  const rows = [
+    { d: 'r', t: 'SYN', s: `seq=${x}` },
+    { d: 'l', t: 'SYN+ACK', s: `seq=${y} ack=${x + 1}` },
+    { d: 'r', t: 'ACK', s: `ack=${y + 1}` },
+    { d: 'b', t: 'data transfer', s: '' },
+  ];
+  return mk('open', rows, [
+    ['데이터를 보내기 전에, 양쪽이 준비됐는지 확인하려고 세 번 주고받아요.', 0, '연결 전', '연결 전'],
+    ['클라이언트가 SYN을 보내요. 자기 시작 번호(seq)를 담아 연결을 요청해요.', 1, 'SYN_SENT', '연결 전'],
+    ['서버가 SYN+ACK를 보내요. SYN을 받았다는 확인과 서버의 시작 번호를 함께 담아요.', 2, 'SYN_SENT', 'SYN_RECEIVED'],
+    ['클라이언트가 ACK를 보내요. 서버 번호를 받았다는 확인이고, 양쪽이 ESTABLISHED가 돼요.', 3, CONNECTED, CONNECTED],
+    ['연결이 맺어졌어요. 이제 데이터를 서로 주고받을 수 있어요.', 4, CONNECTED, CONNECTED],
+  ]);
+}
+
+// 연결 종료(4-way): FIN과 ACK가 두 쌍
+const CLOSE = mk('close', [
+  { d: 'b', t: 'data transfer', s: '' },
+  { d: 'r', t: 'FIN', s: '' },
+  { d: 'l', t: 'ACK', s: '' },
+  { d: 'l', t: 'FIN', s: '' },
+  { d: 'r', t: 'ACK', s: '' },
+], [
+  ['데이터를 주고받던 연결이에요. 이제 연결을 닫는 과정을 볼게요.', 1, CONNECTED, CONNECTED],
+  ['먼저 닫으려는 클라이언트가 FIN을 보내요.', 2, 'FIN 보냄', CONNECTED],
+  ['서버가 ACK로 FIN을 받았다고 알려요. 연결은 반쯤만 닫힌 상태예요.', 3, 'FIN 보냄', 'half-close'],
+  ['서버도 보낼 것을 다 보내고 나면 자기 FIN을 보내요.', 4, 'FIN 보냄', 'FIN 보냄'],
+  ['클라이언트가 ACK를 보내요. 서버는 종료되고, 클라이언트는 TIME_WAIT에서 기다려요.', 5, 'TIME_WAIT', '종료'],
+  ['기다림이 끝나면 클라이언트도 종료돼요. 마지막 ACK가 사라질 때를 대비한 시간이에요.', 5, '종료', '종료'],
+]);
+
+const MODES = { '연결 수립(3-way)': open(100, 300), '연결 종료(4-way)': CLOSE };
+
+// Tabler 아이콘: device-desktop, server
+const PC = '<svg class="sim-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1l0 -10 M7 20h10 M9 16v4 M15 16v4"/></svg>';
+const SERVER = '<svg class="sim-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z M7 8l0 .01 M7 16l0 .01"/></svg>';
+
+const host = (icon, name, state, pop) =>
+  `<div class="host">${icon}<b>${name}</b><span class="st${state === CONNECTED ? ' on' : ''}${pop ? ' sim-pop' : ''}">${state}</span></div>`;
+
+// 그리기: 위에 두 상자(상태), 아래에 지금까지 오간 화살표. 아직 안 나온 화살표는 자리만 잡는다
+function render(s, stage) {
+  const rows = s.rows.map((r, i) =>
+    `<div class="msg ${r.d}${i >= s.shown ? ' off' : ''}${i === s.shown - 1 ? ' cur sim-pop' : ''}"><span class="lbl"><b>${r.t}</b>${r.s ? `<small>${r.s}</small>` : ''}</span><i class="ar"></i></div>`).join('');
+  stage.innerHTML = `
+    <div class="hosts">${host(PC, '클라이언트', s.cs, s.changed.c)}${host(SERVER, '서버', s.ss, s.changed.s)}</div>
+    <div class="wire">${rows}</div>`;
+}
+
+// 직접 해 보기: 두 시작 번호(0부터 999)로 3-way를 다시 만들어 자동 재생
+const err = document.getElementById('err');
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const [x, y] = [e.target.x.value.trim(), e.target.y.value.trim()];
+  // 숫자 1~3자리만 받는다
+  if (!/^[0-9]{1,3}$/.test(x) || !/^[0-9]{1,3}$/.test(y)) {
+    err.textContent = '두 칸 모두 0부터 999까지의 숫자를 넣어 주세요.';
+    err.hidden = false;
+    return;
+  }
+  err.hidden = true;
+  // 연결 종료 탭을 보고 있었다면 연결 수립 탭으로 먼저 옮긴다
+  if (Sim.step().kind !== 'open') document.querySelector('.sim-tabs button').click();
+  Sim.load(open(Number(x), Number(y)));
+  Sim.play(true);
+});
+
+Sim.start({ modes: MODES, render });
+</script>
+</body>
+</html>

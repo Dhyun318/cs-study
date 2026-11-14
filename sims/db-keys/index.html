@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>table 용어와 key 종류</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 위 꼬리표: 지금 가리키는 용어 */
+.lab { min-height: 32px; margin-bottom: 6px; }
+.lab span { display: inline-block; padding: 4px 10px; border-radius: 8px; background: var(--cta); color: #fff; font-size: 13px; font-weight: 700; }
+
+/* 표 바깥 틀: 표 전체를 가리킬 때 파란 테두리 */
+.kw { overflow: hidden; border: 1.5px solid var(--grey-200); border-radius: 12px; }
+.kw.hl { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-50); }
+.kt { width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; }
+.kt th, .kt td { padding: 0; border-bottom: 1px solid var(--grey-200); }
+.kt tr:last-child td { border-bottom: 0; }
+.kt thead th { background: var(--grey-100); }
+.kt button { display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; }
+.kt .rn { width: 26px; color: var(--ink-2); font-size: 12px; }
+.kh { min-height: 52px; padding: 4px 2px; font-weight: 700; }
+.kc { height: 40px; white-space: nowrap; }
+
+/* 키 꼬리표: 열 이름 아래 */
+.tag { display: block; min-height: 16px; margin: 2px 2px 0; border-radius: 6px; font-size: 11px; font-style: normal; font-weight: 700; line-height: 16px; }
+.tag.pk { background: var(--cta); color: #fff; }
+.tag.ak { background: var(--bg); color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--blue); }
+.tag.ck { background: var(--blue-50); color: var(--accent-text); }
+
+/* 강조: 가리킨 열, 고른 키 열, 가리킨 행, 둘이 만나는 칸, 겹친 행 */
+.kt td.hc, .kt td.kk { background: var(--blue-50); }
+.kt th.hc .kh, .kt th.kk .kh { background: var(--blue-50); color: var(--accent-text); }
+.kt tr.hr td { background: var(--blue-50); }
+.kt tr.hr td.hc { background: var(--cta); color: #fff; }
+.kt tr.dup td { background: var(--red-50); }
+.kt tr.dup td.kk { color: var(--red); font-weight: 700; }
+.kt tr.dup .rn { color: var(--red); font-weight: 700; }
+
+/* 결과 줄: 고른 키가 행을 구분하는지 */
+.res { display: grid; gap: 2px; min-height: 58px; margin-top: 8px; padding: 9px 12px; border-radius: 10px; background: var(--grey-100); }
+.res b { font-size: 14px; }
+.res span { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.res.ok { background: var(--blue-50); }
+.res.ok span { color: var(--accent-text); }
+.res.bad { background: var(--red-50); }
+.res.bad span { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>table 용어와 key 종류</h1>
+  </header>
+  <a class="sim-q" data-q="04-database/1"><span><small>관련 질문</small><b>table 용어와 key 종류</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try">
+    <h2>직접 해 보기</h2>
+    <p>표 맨 위의 열 이름을 눌러 키로 골라 보세요. 여러 열도 돼요. 값이 같은 행은 빨갛게 보여요. 칸을 누르면 그 row와 column이 표시돼요.</p>
+    <div class="sim-row">
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 예시 표 두 개(직접 만든 값): 직원 표, 주문 상품 표
+const TABLES = {
+  emp: {
+    cols: ['emp_no', 'email', 'name', 'dept'],
+    rows: [
+      ['E101', 'han@x.kr', '한결', '개발'],
+      ['E102', 'mun@x.kr', '문하', '디자인'],
+      ['E103', 'seo@x.kr', '한결', '개발'],
+      ['E104', 'jin@x.kr', '진솔', '인사'],
+      ['E105', 'yun@x.kr', '문하', '개발'],
+    ],
+  },
+  ord: {
+    cols: ['order_id', 'product', 'qty'],
+    rows: [
+      ['O-31', '펜', '2'],
+      ['O-31', '공책', '1'],
+      ['O-31', '테이프', '3'],
+      ['O-32', '펜', '1'],
+      ['O-32', '공책', '4'],
+    ],
+  },
+};
+const TAGCLS = { 기본키: 'pk', 대체키: 'ak', 후보키: 'ck', 슈퍼키: 'ck', 선택: 'ck' };
+
+// 단계 하나: 어느 표(tbl)에 무엇을 강조할지. 안 적은 값은 빈 값
+const S = (tbl, caption, o = {}) => ({ tbl, caption, keys: [], tags: {}, hlCols: [], hlRows: [], ...o });
+
+// 고른 열(ks)의 값이 같은 행끼리 묶는다. 묶음 크기가 2 이상이면 겹친 것
+function overlaps(T, ks) {
+  const m = new Map();
+  T.rows.forEach((r, i) => { const k = ks.map(c => r[c]).join('|'); m.set(k, [...(m.get(k) || []), i]); });
+  return [...m.values()].filter(g => g.length > 1);
+}
+
+// 키 고르기 단계: 겹침을 실제로 계산해 결과 줄, 꼬리표, 설명을 만든다
+function keyStep(tbl, keys, caption) {
+  const T = TABLES[tbl];
+  if (!keys.length) return S(tbl, caption || '키로 쓸 열 이름을 눌러 골라요. 여러 개를 함께 골라도 돼요.',
+    { bar: { cls: '', title: '고른 키 없음', text: '열 이름을 눌러 보세요' } });
+  const names = keys.map(c => T.cols[c]).join(' + ');
+  const groups = overlaps(T, keys);
+  const minimal = keys.every(c => overlaps(T, keys.filter(x => x !== c)).length > 0);
+  const tag = groups.length ? '선택' : minimal ? '후보키' : '슈퍼키';
+  const auto = groups.length ? `${names} 열의 값이 같은 행이 있어요. 행을 하나로 못 정하니 키가 못 돼요.`
+    : !minimal ? `${names} 열로 행은 구분돼요. 하지만 빼도 되는 열이 있어서 슈퍼키예요.`
+    : keys.length === 1 ? `${names} 열은 값이 모두 달라서 행이 하나씩 정해져요. 후보키예요.`
+    : `${names} 열을 함께 쓰면 행이 하나씩 정해져요. 하나라도 빼면 겹치니 composite key예요.`;
+  return S(tbl, caption || auto, {
+    keys, tags: Object.fromEntries(keys.map(c => [c, tag])),
+    bar: groups.length
+      ? { cls: 'bad', title: `키: ${names}`, text: `같은 값인 행: ${groups.map(g => g.map(r => r + 1).join(', ') + '번').join(' / ')}` }
+      : { cls: 'ok', title: `키: ${names}`, text: '모든 행이 구분돼요' },
+    dup: groups.flat(),
+  });
+}
+
+// 모드 1: 용어. table, column, row, cell을 차례로 가리킨다
+const TERM = [
+  S('emp', '이 표 전체가 table이에요. 관계형 DB에서는 relation이라고도 불러요.', { label: 'table (relation)', hlTable: true }),
+  S('emp', '세로 한 줄이 column이에요. 이름이 붙은 속성이라 attribute라고도 불러요.', { label: 'column (attribute)', hlCols: [2] }),
+  S('emp', '가로 한 줄이 row예요. 직원 한 명의 정보가 담겨서 tuple, record라고도 불러요.', { label: 'row (tuple, record)', hlRows: [1] }),
+  S('emp', 'row와 column이 만나는 칸에는 값이 하나만 들어가요. 똑같은 row는 두 개 못 둬요.', { label: 'cell', hlRows: [1], hlCols: [2] }),
+];
+
+// 모드 2: 기본키. 후보키 둘 중 하나를 기본키로 고르면 남은 것이 대체키
+const PK = [
+  S('emp', 'emp_no, email 열은 값이 모두 달라서 후보키예요. name, dept 열은 겹쳐요.',
+    { tags: { 0: '후보키', 1: '후보키' }, hlCols: [0, 1] }),
+  S('emp', '후보키 중 하나를 대표로 골라요. 짧고 안 바뀌는 emp_no 열을 primary key로 정했어요.',
+    { tags: { 0: '기본키', 1: '후보키' }, hlCols: [0] }),
+  S('emp', '기본키가 못 된 후보키 email 열은 alternative key(대체키)가 돼요.',
+    { tags: { 0: '기본키', 1: '대체키' }, hlCols: [1] }),
+  S('emp', 'primary key 열은 NULL이나 같은 값을 못 넣어요. 표마다 하나만 정해요.',
+    { tags: { 0: '기본키' }, hlCols: [0] }),
+];
+
+// 모드 3: 복합키. 한 열만으로는 겹치고, 두 열을 함께 쓰면 행이 정해진다
+const COMP = [
+  keyStep('ord', [], '한 주문에 상품이 여러 개 담긴 표예요. 어떤 열을 키로 하면 행이 구분될까요?'),
+  keyStep('ord', [0], 'order_id만 키로 하면 같은 주문의 행끼리 값이 겹쳐요. 행이 하나로 안 정해져요.'),
+  keyStep('ord', [1], 'product만 키로 해도 같은 상품이 다른 주문에 또 나와서 겹쳐요.'),
+  keyStep('ord', [0, 1], '두 열을 함께 키로 하면 같은 쌍이 없어요. 행이 하나씩 정해져요. 이게 composite key예요.'),
+];
+
+// 그리기: 라벨 + 표(열 이름 아래 꼬리표) + 결과 줄
+function render(s, stage) {
+  const T = TABLES[s.tbl], dup = new Set(s.dup || []);
+  const on = (list, c) => list.includes(c);
+  stage.innerHTML = `
+    <div class="lab">${s.label ? `<span class="sim-pop">${s.label}</span>` : ''}</div>
+    <div class="kw${s.hlTable ? ' hl' : ''}"><table class="kt">
+      <thead><tr><th class="rn">#</th>${T.cols.map((n, c) => `
+        <th class="${on(s.hlCols, c) ? 'hc' : ''}${on(s.keys, c) ? ' kk' : ''}"><button class="kh" data-h="${c}" aria-pressed="${on(s.keys, c)}">${n}<i class="tag ${TAGCLS[s.tags[c]] || ''}">${s.tags[c] || ''}</i></button></th>`).join('')}</tr></thead>
+      <tbody>${T.rows.map((r, i) => `
+        <tr class="${on(s.hlRows, i) ? 'hr' : ''}${dup.has(i) ? ' dup' : ''}"><td class="rn num"><button class="kc" data-r="${i}">${i + 1}</button></td>${r.map((v, c) => `
+          <td class="${on(s.hlCols, c) ? 'hc' : ''}${on(s.keys, c) ? ' kk' : ''}"><button class="kc num" data-r="${i}" data-c="${c}">${v}</button></td>`).join('')}</tr>`).join('')}
+      </tbody></table></div>
+    ${s.bar ? `<div class="res ${s.bar.cls}"><b>${s.bar.title}</b><span>${s.bar.text}</span></div>` : ''}`;
+}
+
+// 직접 해 보기: 열 이름 누르면 키 켜고 끄기, 칸 누르면 row와 column 표시
+document.getElementById('sim-stage').addEventListener('click', e => {
+  const b = e.target.closest('button[data-h], button[data-r]');
+  if (!b) return;
+  const s = Sim.step(), { h, r, c } = b.dataset, T = TABLES[s.tbl];
+  if (h !== undefined) {
+    const col = Number(h);
+    Sim.load([keyStep(s.tbl, s.keys.includes(col) ? s.keys.filter(x => x !== col) : [...s.keys, col].sort())]);
+    return;
+  }
+  const row = Number(r), caption = c === undefined
+    ? `${row + 1}번 row를 골랐어요. 값이 한 줄로 묶여 있어요.`
+    : `${row + 1}번 row, ${T.cols[c]} column이 만나는 칸이에요. 값은 ${T.rows[row][c]}.`;
+  Sim.load([{ ...s, caption, label: '', hlTable: false, hlRows: [row], hlCols: c === undefined ? [] : [Number(c)] }]);
+});
+
+Sim.start({ modes: { 용어: TERM, 기본키: PK, 복합키: COMP }, render });
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linked List 끼우기와 빼기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../_kit/kit.css">
+<style>
+/* 노드 그림(SVG): 선, 화살표, 노드 상자 */
+.ll { display: block; width: 100%; height: auto; }
+.ln { fill: none; stroke: var(--grey-700); stroke-width: 1.6; }
+.ln.on { stroke: var(--accent-text); stroke-width: 2.4; }
+.ln.dash { stroke-dasharray: 4 3; }
+.ahp { fill: var(--grey-700); }
+.ahp.on { fill: var(--accent-text); }
+.nd rect { fill: var(--bg); stroke: var(--mute); stroke-width: 1.5; }
+.nd.hl rect { fill: var(--blue-50); stroke: var(--blue); stroke-width: 2; }
+.nd.dim rect { stroke: var(--chev); stroke-dasharray: 4 3; }
+.nd.dim .v { fill: var(--mute); }
+.dv { stroke: var(--mute); stroke-width: 1.2; }
+.nd.hl .dv { stroke: var(--blue); }
+.v { fill: var(--ink); font-size: 15px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.dot { fill: var(--grey-700); }
+.nul { stroke: var(--grey-700); stroke-width: 1.4; }
+.hd rect { fill: var(--cta); }
+.hd text { fill: #fff; font-size: 12px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.cur { fill: var(--accent-text); }
+.cl { fill: var(--accent-text); font-size: 12px; font-weight: 700; text-anchor: middle; }
+.sim-pop { transform-box: fill-box; transform-origin: center; }
+
+/* 메모리 표: head 변수 + 주소 순서로 놓인 노드들 */
+.mh { display: flex; gap: 8px; align-items: baseline; justify-content: center; padding: 10px 14px; border: 1.5px dashed var(--grey-200); border-radius: 14px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.mh b { font-size: 17px; color: var(--ink); }
+.mh.hl b { color: var(--accent-text); }
+.mt { display: grid; gap: 4px; margin-top: 12px; }
+.mr { display: grid; grid-template-columns: 1.15fr .6fr 1.15fr; gap: 6px; align-items: center; padding: 8px 12px; border: 1px solid var(--grey-200); border-radius: 10px; font-size: 15px; font-weight: 600; }
+.mr.th { padding: 0 12px; border: 0; font-size: 12px; color: var(--ink-2); }
+.mr.hl { border-color: var(--blue); background: var(--blue-50); }
+.mr .q { color: var(--mute); }
+.mr .ptr { color: var(--accent-text); font-weight: 700; }
+
+/* 직접 해 보기: 위치 고르기 + 오류 한 줄 */
+.sim-row select { flex: 1; min-width: 0; height: 48px; padding: 0 12px; border: 1px solid var(--grey-200); border-radius: 12px; background: var(--bg); font-size: 16px; }
+.sim-row select:focus { border-color: var(--accent-text); }
+.sim-err { color: var(--red); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="sim-page">
+  <header class="sim-top">
+    <a class="sim-back" href="../index.html" aria-label="시뮬레이션 목록"></a>
+    <h1>Linked List 끼우기와 빼기</h1>
+  </header>
+  <a class="sim-q" data-q="02-data-structure/3"><span><small>관련 질문</small><b>Linked List의 구조</b></span></a>
+
+  <section class="sim-card"><div id="sim-stage"></div></section>
+
+  <form class="sim-try" id="try" novalidate>
+    <h2>직접 해 보기</h2>
+    <p>끼울 위치와 값을 고르면 끼우는 과정을 보여 줘요. 이어서 계속 끼워 볼 수 있어요. 노드는 6개까지예요.</p>
+    <div class="sim-row">
+      <select name="p" aria-label="끼울 위치"></select>
+    </div>
+    <div class="sim-row">
+      <input name="v" inputmode="numeric" maxlength="2" required placeholder="값 0~99" aria-label="끼울 값(숫자)">
+      <button class="sim-btn">끼우기</button>
+      <button type="button" class="sim-btn ghost" onclick="Sim.reset()">처음부터</button>
+    </div>
+    <p class="sim-err" role="alert" hidden></p>
+  </form>
+</div>
+
+<script src="../_kit/kit.js"></script>
+<script>
+// 그림 크기: 노드 하나 44x34, 칸 간격 54, 윗줄(Y0)과 아랫줄(Y1). 노드는 최대 6칸
+const P = 54, X0 = 13, NW = 44, NH = 34, Y0 = 46, Y1 = 112, MAX = 6;
+const nx = n => X0 + n.slot * P;
+const ny = n => (n.row ? Y1 : Y0);
+
+// 단계 = { caption, nodes: [{id, v, slot, row}], next: {id: 다음 id | null(비어 있음)}, head: id,
+//          hl(강조 노드), hlLink(강조 화살표를 낼 노드), hlHead, dim(리스트에서 빠진 노드), cur(지금 위치), pop(방금 생김), h(그림 높이) }
+// 값 목록을 한 줄로 이은 노드들과 next 연결
+const row = vals => vals.map((v, j) => ({ id: 'n' + j, v, slot: j, row: 0 }));
+const chainNext = (vals, ids = vals.map((_, j) => 'n' + j)) => Object.fromEntries(ids.map((id, j) => [id, ids[j + 1] ?? null]));
+
+// 값 목록: head에서 next를 따라가며 읽은 값(리스트 순서). 직접 해 보기의 출발점
+function chain(s) {
+  if (!s.nodes) return null;
+  const by = Object.fromEntries(s.nodes.map(n => [n.id, n]));
+  const out = [];
+  for (let id = s.head; id; id = s.next[id]) out.push(by[id].v);
+  return out;
+}
+
+// 따라가기 단계: head에서 출발해 next를 한 칸씩
+const TV = [9, 21, 34, 48];
+const walk = (caption, o = {}) => ({ caption, nodes: row(TV), next: chainNext(TV), head: 'n0', h: 112, ...o });
+const TRACE = [
+  walk('리스트는 head 하나만 들고 있어요. head가 첫 노드를 가리켜요.', { hlHead: true }),
+  walk('첫 노드에 도착. 표시한 곳이 지금 위치예요. 읽은 값은 9.', { cur: 'n0', hl: ['n0'] }),
+  walk('다음 노드로 가려면 지금 노드의 next를 따라가요.', { cur: 'n0', hl: ['n0'], hlLink: ['n0'] }),
+  walk('두 번째 노드에 도착. 읽은 값은 21.', { cur: 'n1', hl: ['n1'] }),
+  walk('세 번째 노드에 도착. 읽은 값은 34.', { cur: 'n2', hl: ['n2'] }),
+  walk('마지막 노드예요. 읽은 값은 48. next는 비어 있어요(null).', { cur: 'n3', hl: ['n3'] }),
+  walk('n번째 값은 next를 n-1번 따라가야 읽어요. 그래서 접근은 O(n).'),
+];
+
+// 끼우기 단계: p번째 노드 뒤(p = -1이면 맨 앞)에 값 v를 끼운다. 순서: 새 노드의 next 먼저, 그다음 앞쪽 연결
+function insertSteps(vals, p, v) {
+  const n = vals.length;
+  const A = p >= 0 ? 'n' + p : null, B = p + 1 < n ? 'n' + (p + 1) : null;
+  // 끼울 자리를 비워 둔 칸 번호
+  const base = vals.map((x, j) => ({ id: 'n' + j, v: x, slot: j <= p ? j : j + 1, row: 0 }));
+  const next = chainNext(vals);
+  const nw = { id: 'new', v, slot: p + 1, row: 1 };
+  const st = (caption, nodes, nx, o = {}) => ({ caption, nodes, next: nx, head: 'n0', h: 164, hl: ['new'], ...o });
+  const wired = A ? { ...next, [A]: 'new', new: B } : { ...next, new: B };
+  const head = A ? 'n0' : 'new';
+  const tidy = [...base.slice(0, p + 1), nw, ...base.slice(p + 1)].map((x, j) => ({ ...x, slot: j, row: 0 }));
+  const where = p < 0 ? '맨 앞' : p === n - 1 ? '맨 뒤' : `값 ${vals[p]} 노드 뒤`;
+  return [
+    st(`값 ${v} 노드를 ${where}에 끼워 볼게요.`, base, next, { hl: [] }),
+    st('먼저 새 노드를 만들어요. 아직 어디와도 이어지지 않았어요.', [...base, nw], { ...next }, { pop: 'new' }),
+    st(p < 0 ? '새 노드의 next가 지금의 첫 노드를 가리키게 해요.'
+      : B ? '새 노드의 next가 뒤 노드를 가리키게 해요. 이 순서가 먼저예요.'
+      : '맨 뒤라서 새 노드의 next는 null로 둬요.', [...base, nw], { ...next, new: B }, { hlLink: ['new'] }),
+    st(A ? '그다음 앞 노드의 next를 새 노드로 바꿔요. 연결 끝.' : 'head가 새 노드를 가리키게 바꿔요. 연결 끝.',
+      [...base, nw], wired, { head, hlLink: A ? [A] : [], hlHead: !A }),
+    st('포인터 두 개만 바꿨어요. 위치를 이미 안다면 시간은 O(1).', tidy, wired, { head }),
+  ];
+}
+const INSERT_BASE = [5, 12, 20, 33];
+const INSERT = insertSteps(INSERT_BASE, 1, 16);
+
+// 빼기 단계: 값 27 노드(세 번째)를 건너뛰게 앞 노드의 next만 바꾼다
+const DV = [8, 14, 27, 31, 45];
+const dn = (caption, nodes, next, o = {}) => ({ caption, nodes, next, head: 'n0', h: 164, ...o });
+const dBase = row(DV);
+const dLift = dBase.map(n => (n.id === 'n2' ? { ...n, row: 1 } : n));
+const dSkip = { ...chainNext(DV), n1: 'n3' };
+const DELETE = [
+  dn('지울 노드는 값 27. 앞 노드의 next가 지금 이 노드를 가리켜요.', dBase, chainNext(DV), { hl: ['n2'], hlLink: ['n1'] }),
+  dn('앞 노드의 next를 지울 노드의 다음 노드로 바꿔요.', dLift, dSkip, { hl: ['n2'], hlLink: ['n1'] }),
+  dn('값 27 노드는 head에서 따라가도 닿지 않아요. 리스트에서 빠졌어요.', dLift, dSkip, { dim: ['n2'] }),
+  dn('바꾼 포인터는 하나뿐이에요. 위치를 이미 안다면 시간은 O(1).',
+    dBase.filter(n => n.id !== 'n2').map((n, j) => ({ ...n, slot: j })), dSkip, { hl: ['n1'] }),
+];
+
+// 주소 보기: 노드는 흩어진 주소(예시 값)에 있고, next 칸에는 다음 노드의 주소가 들어 있다
+const LOG = [{ v: 9, a: '0x3C20' }, { v: 21, a: '0x3A08' }, { v: 34, a: '0x3F90' }, { v: 48, a: '0x3B54' }];
+const ROWS = LOG.map((n, i) => ({ ...n, next: LOG[i + 1]?.a ?? 'null' })).sort((x, y) => (x.a < y.a ? -1 : 1));
+const at = i => ROWS.findIndex(r => r.a === LOG[i].a);
+const memo = (caption, o = {}) => ({ caption, mem: true, ...o });
+const MEMORY = [
+  memo('노드는 메모리 곳곳에 놓여요. 주소는 예시로 정한 값이에요.'),
+  memo('노드마다 next 칸에 다음 노드의 주소가 들어 있어요.', { showNext: true }),
+  memo('head는 첫 노드의 주소만 알고 있어요.', { showNext: true, head: true, cur: at(0) }),
+  memo('그 주소로 가서 노드를 읽어요. 읽은 값은 9.', { showNext: true, head: true, cur: at(0) }),
+  memo('next 칸에 적힌 주소로 건너뛰어요. 다음 노드는 위쪽에 있어요.', { showNext: true, head: true, cur: at(1), from: at(0) }),
+  memo('이번에는 아래쪽 노드로 가요. 읽은 값은 34.', { showNext: true, head: true, cur: at(2), from: at(1) }),
+  memo('마지막 노드의 next는 null이라 여기서 끝나요.', { showNext: true, head: true, cur: at(3), from: at(2) }),
+  memo('표에서 읽는 순서와 리스트 순서는 달라요. 순서는 next가 이어 줘요.', { showNext: true, head: true }),
+];
+
+// 화살표: 노드 a의 next 점에서 노드 b까지 (같은 줄이면 왼쪽 변, 다른 줄이면 위 또는 아래 변 가운데)
+function link(a, b) {
+  const sx = nx(a) + 36, sy = ny(a) + 17;
+  if (ny(a) === ny(b)) return [sx, sy, nx(b), ny(b) + 17];
+  return [sx, sy, nx(b) + 22, ny(b) + (ny(b) > ny(a) ? 0 : NH)];
+}
+
+// 노드 그림 한 장
+function drawNodes(s) {
+  const by = Object.fromEntries(s.nodes.map(n => [n.id, n]));
+  const has = (list, id) => (list || []).includes(id);
+  const line = (x1, y1, x2, y2, on, dash) => `<line class="ln${on ? ' on' : ''}${dash ? ' dash' : ''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#${on ? 'ahb' : 'ah'})"/>`;
+  const arrows = s.nodes.filter(n => s.next[n.id]).map(n => line(...link(n, by[s.next[n.id]]), has(s.hlLink, n.id), has(s.dim, n.id))).join('');
+  const t = by[s.head];
+  const head = `<g class="hd"><rect x="${X0}" y="4" width="${NW}" height="24" rx="7"/><text x="${X0 + 22}" y="16">head</text></g>`
+    + line(X0 + 22, 28, nx(t) + 22, ny(t), s.hlHead);
+  const nodes = s.nodes.map(n => {
+    const x = nx(n), y = ny(n), nxt = s.next[n.id];
+    const cls = (has(s.hl, n.id) ? ' hl' : '') + (has(s.dim, n.id) ? ' dim' : '') + (n.id === s.pop ? ' sim-pop' : '');
+    const mark = nxt ? `<circle class="dot" cx="${x + 36}" cy="${y + 17}" r="3"/>`
+      : nxt === null ? `<line class="nul" x1="${x + 31}" y1="${y + NH - 7}" x2="${x + 41}" y2="${y + 7}"/>` : '';
+    return `<g class="nd${cls}"><rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="8"/><line class="dv" x1="${x + 28}" y1="${y}" x2="${x + 28}" y2="${y + NH}"/><text class="v" x="${x + 14}" y="${y + NH / 2}">${n.v}</text>${mark}</g>`;
+  }).join('');
+  const c = by[s.cur];
+  const cur = c ? `<path class="cur" d="M${nx(c) + 22} ${Y0 + NH + 5}l-5 7h10z"/><text class="cl" x="${nx(c) + 22}" y="${Y0 + NH + 26}">지금</text>` : '';
+  const mk = (id, on) => `<marker id="${id}" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ahp${on ? ' on' : ''}" d="M0 0L8 4L0 8z"/></marker>`;
+  return `<svg class="ll" viewBox="0 0 340 ${s.h}" role="img" aria-label="${s.caption}"><defs>${mk('ah')}${mk('ahb', true)}</defs>${arrows}${head}${nodes}${cur}</svg>`;
+}
+
+// 메모리 표 한 장: 주소 순서로 늘어놓은 노드들
+function drawMemory(s) {
+  const rows = ROWS.map((r, i) => `<div class="mr num${s.cur === i ? ' hl' : ''}"><span>${r.a}</span><span>${r.v}</span>`
+    + (s.showNext ? `<span class="${s.from === i ? 'ptr' : ''}">${r.next}</span>` : '<span class="q">?</span>') + '</div>').join('');
+  return `<div class="mh num${s.head && s.cur === at(0) && s.from === undefined ? ' hl' : ''}">변수 head = <b>${s.head ? LOG[0].a : '?'}</b></div>
+    <div class="mt"><div class="mr th"><span>메모리 주소</span><span>값</span><span>next</span></div>${rows}</div>`;
+}
+
+// 그리기
+function render(s, stage) {
+  stage.innerHTML = s.mem ? drawMemory(s) : drawNodes(s);
+  syncSelect(chain(s) || INSERT_BASE);
+}
+
+// 끼울 위치 목록: 지금 리스트가 바뀔 때만 다시 만들고, 고른 순번은 가능하면 유지
+function syncSelect(vals) {
+  const sel = document.querySelector('#try select'), key = vals.join();
+  if (sel.dataset.key === key) return;
+  const keep = sel.selectedIndex;
+  sel.replaceChildren(...['맨 앞', ...vals.map(x => `값 ${x} 노드 뒤`)].map((t, i) => new Option(t, i - 1)));
+  sel.dataset.key = key;
+  sel.selectedIndex = Math.max(0, Math.min(keep, vals.length));
+}
+
+// 직접 해 보기: 지금 보이는 리스트의 고른 위치에 값을 끼우는 단계를 만들어 자동 재생
+document.getElementById('try').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target, err = f.querySelector('.sim-err');
+  const vals = chain(Sim.step()) || INSERT_BASE, raw = f.v.value.trim(), p = Number(f.p.value);
+  const fail = msg => { err.textContent = msg; err.hidden = false; };
+  if (!/^\d{1,2}$/.test(raw)) return fail('0부터 99까지 숫자 한 개만 넣어 주세요.');
+  if (vals.length >= MAX) return fail('노드는 6개까지만 그려요. 처음부터 눌러서 다시 해 보세요.');
+  if (!Number.isInteger(p) || p < -1 || p >= vals.length) return fail('끼울 위치를 다시 골라 주세요.');
+  err.hidden = true;
+  document.querySelectorAll('.sim-tabs button')[1].click(); // 끼우기 탭으로 옮긴 뒤 단계를 바꾼다
+  Sim.load(insertSteps(vals, p, Number(raw)));
+  Sim.play(true);
+  f.v.value = '';
+});
+
+Sim.start({ modes: { 따라가기: TRACE, 끼우기: INSERT, 빼기: DELETE, 주소: MEMORY }, render });
+</script>
+</body>
+</html>
