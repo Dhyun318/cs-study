@@ -1,9 +1,19 @@
-# 버셀은 scripts/build.py 로 app/ 을 만든다. 빌드에 필요 없는 것은 올리지 않는다
+# 버셀은 scripts/assemble_site.py 로 dist/ 를 만든다(랜딩 + app/). 빌드에 필요 없는 것은 올리지 않는다
 _reference/
-design/
-docs/
+# design/ 중 랜딩과 랜딩이 쓰는 그림만 남긴다
+design/*
+!design/landing/
+!design/v2/
+design/v2/*
+!design/v2/illustrations/
+design/landing/shots/
+design/landing/motion/
+# docs/ 중 시뮬레이션 제목 표(simulations.md)는 build.py 가 읽는다
+docs/*
+!docs/simulations.md
 graphify-out/
 .omc/
 .claude/
 *.pdf
 app/CLAUDE.md
+dist/

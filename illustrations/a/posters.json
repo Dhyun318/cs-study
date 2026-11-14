@@ -1,0 +1,126 @@
+{
+ "bplus-tree": {
+  "vb": "16 112 358 241",
+  "fade": false
+ },
+ "bst-search": {
+  "vb": "16 108 358 261",
+  "fade": false
+ },
+ "bst-structure": {
+  "vb": "16 108 358 261",
+  "fade": false
+ },
+ "context-switch": {
+  "vb": "16 109 358 322",
+  "fade": true
+ },
+ "cookie-session": {
+  "vb": "16 109 358 183",
+  "fade": false
+ },
+ "db-keys": {
+  "vb": "16 109 358 236",
+  "fade": false
+ },
+ "deadlock": {
+  "vb": "16 109 358 279",
+  "fade": false
+ },
+ "dynamic-array": {
+  "vb": "16 108 358 152",
+  "fade": false
+ },
+ "encapsulation": {
+  "vb": "16 105 301 156",
+  "fade": false
+ },
+ "er-relationship": {
+  "vb": "16 109 358 139",
+  "fade": false
+ },
+ "google-request": {
+  "vb": "16 111 358 322",
+  "fade": true
+ },
+ "hash-collision": {
+  "vb": "16 108 358 210",
+  "fade": false
+ },
+ "hash-storage": {
+  "vb": "16 108 358 322",
+  "fade": true
+ },
+ "heap": {
+  "vb": "16 105 358 322",
+  "fade": true
+ },
+ "http-message": {
+  "vb": "16 109 358 171",
+  "fade": false
+ },
+ "index-search": {
+  "vb": "16 109 358 253",
+  "fade": false
+ },
+ "ipc": {
+  "vb": "16 109 358 194",
+  "fade": false
+ },
+ "join-types": {
+  "vb": "16 106 358 223",
+  "fade": false
+ },
+ "linked-list": {
+  "vb": "16 108 358 251",
+  "fade": false
+ },
+ "mutex": {
+  "vb": "16 109 358 192",
+  "fade": false
+ },
+ "paging": {
+  "vb": "16 109 358 161",
+  "fade": false
+ },
+ "process-memory": {
+  "vb": "16 108 358 209",
+  "fade": false
+ },
+ "queue-stack": {
+  "vb": "16 108 358 178",
+  "fade": false
+ },
+ "race-condition": {
+  "vb": "16 108 358 320",
+  "fade": false
+ },
+ "segmentation": {
+  "vb": "16 109 358 166",
+  "fade": false
+ },
+ "semaphore": {
+  "vb": "16 109 358 164",
+  "fade": false
+ },
+ "tcp-handshake": {
+  "vb": "16 106 358 298",
+  "fade": false
+ },
+ "tcp-udp-header": {
+  "vb": "16 108 358 304",
+  "fade": false
+ },
+ "tcp-udp-order": {
+  "vb": "16 109 358 180",
+  "fade": false
+ },
+ "transaction-lock": {
+  "vb": "16 108 358 211",
+  "fade": false
+ },
+ "virtual-memory": {
+  "vb": "16 112 358 322",
+  "fade": true
+ }
+}

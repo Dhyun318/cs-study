@@ -1,21 +1,54 @@
-# PR과 main 푸시마다: 앱 빌드, 시뮬레이션 화면 점검(넘침·콘솔 오류·em dash)
+# PR과 main 푸시마다: 사이트 조립, 시뮬레이션 화면 점검, 앱 흐름 점검, 시뮬레이션 가림 점검, em dash 검사
 name: check
 on:
   pull_request:
   push:
     branches: [main]
+# 같은 브랜치에 새 push 가 오면 이전 실행 취소
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # 앱 빌드(배포와 같은 명령)
-      - run: python3 scripts/build.py
-      # 시뮬레이션 점검에 필요한 브라우저
-      - run: pip install playwright && python -m playwright install --with-deps chromium
+      # pip 캐시(설치 목록 파일이 없어서 직접 캐시)
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-playwright-numpy-pillow
+      # 점검 스크립트가 쓰는 패키지(playwright, numpy, Pillow)
+      - run: pip install playwright numpy pillow
+      # playwright 브라우저 캐시(버전이 바뀌면 새로 받음)
+      - id: pw
+        run: |
+          echo "v=$(pip show playwright | sed -n 's/^Version: //p')" >> "$GITHUB_OUTPUT"
+      - id: pwcache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.v }}
+      - if: steps.pwcache.outputs.cache-hit != 'true'
+        run: python -m playwright install --with-deps chromium
+      # 캐시가 맞았으면 브라우저는 받아져 있으니 시스템 라이브러리만 설치
+      - if: steps.pwcache.outputs.cache-hit == 'true'
+        run: python -m playwright install-deps chromium
+      # 한글 글꼴(글자 폭과 줄바꿈이 로컬과 같아야 넘침 검사가 맞다)
+      - run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+      # 사이트 조립(build.py 를 부르고 dist/ 를 만든다)
+      - run: python3 scripts/assemble_site.py
       - run: python3 sims/_kit/check.py
+      - run: python3 scripts/check_app.py
+      # 30개 시뮬레이션의 모든 단계를 넘기므로 오래 걸린다
+      - run: python3 scripts/check_sim_cover.py
+        timeout-minutes: 30
       # 배포물에 em dash 금지
-      - run: "! grep -rlI -e '—' -e '–' app notes sims illustrations/a"
+      - name: em dash 0
+        run: |
+          rc=0; grep -rlI -e '—' -e '–' app notes sims illustrations design/landing || rc=$?
+          [ "$rc" -eq 1 ]

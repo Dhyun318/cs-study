@@ -9,7 +9,11 @@
 - [x] P 화면 흐름 `design/p-flow/index.html` (오픽 `spike/design/final/index.html` 형식)
 - [x] 시뮬레이션 29개 `sims/<id>/` (과목별 5묶음). 다 되면 `sims/index.html`에 각 묶음 보고의 `<li>` 줄 등록, `python3 sims/_kit/check.py` 전체 PASS 확인
 - [x] 앱 만들기 `app/`
-- [x] 버셀 배포: https://cs-study-sooty.vercel.app (프로젝트 cs-study, 2026-11-14). 다시 배포: `python3 scripts/build.py` 후 `cd app && npx vercel deploy --prod`
+- [x] 버셀 배포: https://cs-study-sooty.vercel.app (프로젝트 cs-study, 2026-11-14). 다시 배포: `python3 scripts/build.py` 후 프로젝트 루트에서 `npx vercel deploy --prod` (vercel.json 과 .vercel 연결이 루트에 있음)
+- [x] v2 디자인 평가 통과 (4회차 91 / 89.5 / 94.5, design/v2/review/)
+- [ ] v2 웹앱 구현 app/ (남은 평가 지적, 읽음으로 표시, 남은 단락, 오프라인 서비스 워커 포함). 검사: scripts/check_app.py, scripts/check_sim_cover.py, sims/_kit/check.py
+- [ ] 랜딩 시안 design/landing/ 사용자 확인 → 첫 주소에 랜딩, 앱을 /app/ 로 옮기기
+- [ ] 커밋, GitHub push, 버셀 배포
 
 ## 상태 확인 방법
 - 시뮬레이션: `ls sims/` 폴더 수(목표: _kit, hash-table + 29개)와 `python3 sims/_kit/check.py`
@@ -17,7 +21,7 @@
 
 ## 앱 만들기 계획 (결정)
 - 기준: `design/p-flow/index.html` 화면 그대로 구현. 화면 목록은 `docs/features.md`.
-- 순수 HTML/CSS/JS, 프레임워크 없음. hash 라우팅(#/home, #/toc, #/q/<id>, #/sims, #/sim/<id>, #/review).
+- 순수 HTML/CSS/JS, 프레임워크 없음. hash 라우팅(#/home, #/toc, #/q/<id>, #/sims, #/sim/<id>, #/toc/conf).
 - 본문: `notes/*.md`를 스크립트로 `app/data/notes.json`으로 변환해 둔다(빌드는 로컬, 결과 파일을 배포). `[[sim:<id>]]`는 시뮬레이션 링크와 `illustrations/a/<id>.svg` 그림으로 바꾼다. `hash-storage`, `hash-collision`은 `hash-table`로 연결.
 - 상태(읽음, 헷갈림, 마지막 위치)는 localStorage.
 - 배포 폴더 `app/`에 앱 + `sims/` + `illustrations/a/` 사본만 넣는다. `_reference/`(책 원본), `design/`, `docs/`는 넣지 않는다(저작권).

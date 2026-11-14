@@ -33,9 +33,15 @@ h2, p { margin: 0; }
 
 .page { max-width: 430px; min-height: 100dvh; margin: 0 auto; background: var(--canvas); padding-bottom: 40px; }
 
-.nav { position: sticky; top: 0; z-index: 3; height: 52px; display: flex; align-items: center; padding: 0 16px 0 20px; background: var(--canvas); }
-.nav b { font-size: 17px; font-weight: 700; margin-right: auto; }
-.cap { display: flex; gap: 14px; align-items: center; padding: 6px 12px; border-radius: 99px; background: rgba(32,32,32,.06); }
+.nav { position: sticky; top: 0; z-index: 3; height: 52px; display: flex; align-items: center; padding: 0 8px 0 20px; background: var(--canvas); }
+.nav b { min-width: 0; font-size: 17px; font-weight: 700; margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 위 막대: 왼쪽 앱 이름(누르면 홈) 또는 뒤로 + 제목, 오른쪽 홈·목차·시뮬레이션 탭(어느 화면에서나 한 번에) */
+.brand { display: flex; align-items: center; height: 44px; margin-right: auto; font-size: 17px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+.tabs { flex: none; display: flex; }
+.tabs a { position: relative; min-width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 9px; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--grey-700); white-space: nowrap; transition: background-color .12s; }
+.tabs a:active { background: rgba(32,32,32,.06); }
+.tabs a[aria-current] { color: var(--grey-900); }
+.tabs a[aria-current]::after { content: ""; position: absolute; left: 9px; right: 9px; bottom: 5px; height: 2px; border-radius: 1px; background: currentColor; }
 
 .grp { background: var(--bg); border-radius: 20px; margin: 12px 12px 0; padding: 6px 0; }
 .lh { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 8px; }
@@ -76,11 +82,10 @@ h2, p { margin: 0; }
 .cta { margin-top: 16px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: var(--cta); color: #fff; font-size: 17px; font-weight: 700; transition: transform .12s; }
 .cta:active { transform: scale(.98); }
 
-.rv .lr { padding: 14px 20px; }
-.rv .as { width: 44px; height: 44px; background: var(--blue-50); color: var(--accent-text); }
-.rv .tx b { font-size: 17px; font-weight: 700; }
-.rv .cnt { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: var(--accent-text); }
-.rv .cnt span { font-size: 15px; font-weight: 700; margin-left: 1px; }
+/* 홈: 랜덤 질문 */
+.rnd .lr { padding: 14px 20px; }
+.rnd .as { width: 44px; height: 44px; background: var(--blue-50); color: var(--accent-text); }
+.rnd .tx b { font-size: 17px; font-weight: 700; }
 
 .hs { display: flex; gap: 8px; overflow-x: auto; padding: 6px 20px 14px; scroll-snap-type: x mandatory; scroll-padding: 0 20px; scrollbar-width: none; }
 .hs::-webkit-scrollbar { display: none; }
@@ -119,6 +124,7 @@ button:disabled { cursor: default; }
 .chip::after { content: ""; position: absolute; inset: -4px -3px; }
 .chip[aria-current="page"] { background: var(--cta); color: #fff; }
 .chip .ic { color: currentColor; }
+.chip .num { margin-left: 2px; font-weight: 700; }
 
 /* 목차 줄: 왼쪽 번호(읽으면 체크), 제목 앞 별 꼬리표 */
 .sub-h { margin: 0; padding: 14px 20px 2px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
@@ -141,35 +147,44 @@ button.cta { width: 100%; border: 0; }
 .ans-top { display: flex; align-items: center; justify-content: space-between; }
 .ans-top small { font-size: 14px; font-weight: 700; color: var(--accent-text); }
 .link-btn { height: 44px; margin-right: -8px; padding: 0 8px; border: 0; border-radius: 12px; background: none; font-size: 14px; font-weight: 600; color: var(--ink-2); }
-.core { margin-top: 2px; padding: 16px; border-radius: 16px; background: var(--blue-50); color: var(--ink); }
+.core { margin-top: 2px; padding: 16px; border-radius: 16px; background: var(--blue-50); color: var(--grey-900); font-weight: 500; }
 .body { margin-top: 8px; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 .rise { animation: rise .22s ease-out; }
 @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
 
-/* 해설 본문 */
-.prose { font-size: 16px; line-height: 1.75; color: var(--grey-800); }
+/* 해설 본문: 휴대폰에서 오래 읽기 좋게 17px, 줄 간격 1.75, 글자 #333d4b(흰 바탕 대비 11:1).
+   한글은 어절 단위로 줄을 바꾸고(keep-all), 긴 영어·코드만 아무 데서나 끊는다 */
+.prose { font-size: 17px; line-height: 1.75; color: var(--grey-800); word-break: keep-all; overflow-wrap: anywhere; }
 .prose > :first-child { margin-top: 0; }
-.prose p { margin: 12px 0 0; }
+.prose p { margin: 16px 0 0; }
 .prose .core > p:first-child, .prose .tip > p:first-child { margin-top: 0; }
-.prose .core { margin-top: 12px; }
-.prose h3 { margin: 30px 0 0; font-size: 18px; font-weight: 700; line-height: 1.45; letter-spacing: -0.02em; color: var(--ink); }
-.prose ul, .prose ol { margin: 12px 0 0; padding-left: 22px; }
-.prose li { margin-top: 6px; }
+.prose .core { margin-top: 16px; }
+.prose ul, .prose ol { margin: 14px 0 0; padding-left: 1.4em; }
+.prose li { margin-top: 8px; padding-left: 2px; }
+.prose li::marker { color: #8B95A1; }
+.prose ol > li::marker { font-weight: 700; color: var(--grey-700); }
 .prose li p { margin-top: 6px; }
-.prose li ul { margin-top: 4px; }
-.prose b { color: var(--ink); }
-.prose figure { margin: 16px 0 0; }
+.prose li ul, .prose li ol { margin-top: 6px; }
+.prose b { font-weight: 700; color: var(--grey-900); }
+.prose figure { margin: 20px 0 0; }
 .prose img { display: block; width: 100%; height: auto; }
-.prose .tip { margin: 16px 0 0; padding: 14px 16px; border-radius: 16px; background: var(--grey-100); font-size: 15px; line-height: 1.7; }
-.prose code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: 1px 5px; border-radius: 4px; background: var(--grey-100); }
-.prose pre { margin: 16px 0 0; padding: 14px 16px; overflow-x: auto; border-radius: 12px; background: var(--grey-100); font-size: 13px; line-height: 1.6; }
+/* 그림은 카드 폭 끝까지(그림 안에 좌우 여백 24px 이 있다). 그림 속 작은 글자를 조금이라도 크게 */
+.prose > figure.ill img { width: calc(100% + 40px); max-width: none; margin: 0 -20px; }
+.prose .tip { margin: 16px 0 0; padding: 14px 16px; border-radius: 16px; background: var(--grey-100); font-size: 16px; line-height: 1.7; }
+.prose code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; padding: 1px 5px; border-radius: 4px; background: var(--grey-100); color: var(--grey-900); }
+.prose pre { margin: 16px 0 0; padding: 14px 16px; overflow-x: auto; border-radius: 12px; background: var(--grey-100); font-size: 14px; line-height: 1.6; overflow-wrap: normal; }
 .prose pre code { padding: 0; background: none; font-size: inherit; }
-.prose .tbl { margin: 16px 0 0; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
-.prose table { min-width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.55; }
-.prose th, .prose td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
-.prose th { background: var(--grey-100); font-weight: 700; color: var(--ink); white-space: nowrap; }
+/* 표: 작게, 넘치면 칸 안에서 옆으로 민다. 첫 열(이름)은 최소 폭을 두어 짧은 이름이 쪼개지지 않게 */
+.prose .tbl { margin: 16px 0 0; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; overflow-wrap: normal; }
+.prose table { min-width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.55; }
+.prose th, .prose td { padding: 9px 11px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.prose th { background: var(--grey-100); font-weight: 700; color: var(--grey-900); white-space: nowrap; }
+.prose td:first-child { min-width: 5.5em; font-weight: 600; color: var(--grey-900); }
 .prose tr:last-child td { border-bottom: 0; }
+/* 소제목: 본문보다 크고 진하게, 위를 넉넉히 띄워 단락 묶음을 나눈다 */
+.prose h3 { margin: 32px 0 0; font-size: 19px; font-weight: 700; line-height: 1.45; letter-spacing: -0.02em; color: var(--grey-900); }
+.prose h3 + * { margin-top: 10px; }
 
 /* 동작으로 보기 줄 */
 .go .as { background: var(--blue-50); color: var(--accent-text); }
@@ -223,15 +238,7 @@ button.cta { width: 100%; border: 0; }
 .frame iframe { display: block; width: 100%; height: 1150px; margin-top: -48px; border: 0; }
 /* ponytail: 높이 고정(가장 긴 시뮬레이션 1140px 기준, file:// 에서는 안쪽 높이를 못 읽음). 앱에서는 같은 출처라 내용 높이에 맞추면 된다 */
 
-/* 복습 카드 */
-.card { padding: 20px; }
-.card-top { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; color: var(--ink-2); }
-.card h2 { margin-top: 8px; font-size: 20px; font-weight: 700; line-height: 1.45; letter-spacing: -0.02em; text-wrap: pretty; }
-.card h2 .hotx { font-size: 13px; line-height: 22px; margin-right: 6px; vertical-align: 2px; }
-.card .core { margin-top: 16px; }
-.more { display: flex; align-items: center; gap: 2px; height: 44px; margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
-.more .ic { color: var(--chev); }
-.duo { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* 빈 상태 (목차 헷갈림만) */
 .empty { padding: 36px 24px 24px; text-align: center; }
 .empty .as { margin: 0 auto; width: 56px; height: 56px; background: var(--blue-50); color: var(--accent-text); }
 .empty h2 { margin-top: 16px; font-size: 19px; font-weight: 700; }
@@ -279,7 +286,7 @@ body.maponly .map { max-width: none; border-radius: 0; }
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-chev" viewBox="0 0 16 16"><path d="m5.75 13.4c-.23 0-.46-.09-.64-.26a.9.9 0 0 1 0-1.27l3.87-3.87-3.87-3.86a.9.9 0 0 1 0-1.27.9.9 0 0 1 1.27 0l4.5 4.5a.9.9 0 0 1 0 1.27l-4.5 4.5c-.17.17-.4.26-.63.26"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path fill-rule="evenodd" d="m13.154 1.927 2.327 4.715c.187.379.549.642.968.703l5.203.756c1.054.153 1.476 1.45.712 2.193l-3.765 3.67a1.287 1.287 0 0 0 -.37 1.138l.889 5.182c.18 1.051-.922 1.851-1.865 1.356l-4.654-2.447a1.284 1.284 0 0 0 -1.196 0l-4.654 2.447c-.944.495-2.046-.305-1.866-1.356l.889-5.182a1.288 1.288 0 0 0 -.37-1.138l-3.765-3.67c-.763-.743-.342-2.04.713-2.193l5.202-.756c.419-.061.782-.324.969-.703l2.326-4.715c.472-.956 1.835-.956 2.307 0"/></symbol>
-  <symbol id="t-repeat" viewBox="0 0 24 24"><path d="M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3" /><path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3" /></symbol>
+  <symbol id="t-arrows-shuffle" viewBox="0 0 24 24"><path d="M18 4l3 3l-3 3" /><path d="M18 20l3 -3l-3 -3" /><path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5" /><path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3" /></symbol>
   <symbol id="t-stack-2" viewBox="0 0 24 24"><path d="M12 4l-8 4l8 4l8 -4l-8 -4" /><path d="M4 12l8 4l8 -4" /><path d="M4 16l8 4l8 -4" /></symbol>
   <symbol id="t-cpu" viewBox="0 0 24 24"><path d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -12" /><path d="M9 9h6v6h-6l0 -6" /><path d="M3 10h2" /><path d="M3 14h2" /><path d="M10 3v2" /><path d="M14 3v2" /><path d="M21 10h-2" /><path d="M21 14h-2" /><path d="M14 21v-2" /><path d="M10 21v-2" /></symbol>
   <symbol id="t-database" viewBox="0 0 24 24"><path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0 -16 0" /><path d="M4 6v6a8 3 0 0 0 16 0v-6" /><path d="M4 12v6a8 3 0 0 0 16 0v-6" /></symbol>
@@ -290,8 +297,6 @@ body.maponly .map { max-width: none; border-radius: 0; }
   <symbol id="t-arrows-left-right" viewBox="0 0 24 24"><path d="M21 17l-18 0" /><path d="M6 10l-3 -3l3 -3" /><path d="M3 7l18 0" /><path d="M18 20l3 -3l-3 -3" /></symbol>
   <symbol id="t-lock" viewBox="0 0 24 24"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6" /><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" /><path d="M8 11v-4a4 4 0 1 1 8 0v4" /></symbol>
   <symbol id="t-world" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M3.6 9h16.8" /><path d="M3.6 15h16.8" /><path d="M11.5 3a17 17 0 0 0 0 18" /><path d="M12.5 3a17 17 0 0 1 0 18" /></symbol>
-  <symbol id="t-dots" viewBox="0 0 24 24"><path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></symbol>
-  <symbol id="t-x" viewBox="0 0 24 24"><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></symbol>
   <symbol id="t-check" viewBox="0 0 24 24"><path d="M5 12l5 5l10 -10" /></symbol>
   <symbol id="t-arrow-left" viewBox="0 0 24 24"><path d="M5 12l14 0" /><path d="M5 12l6 6" /><path d="M5 12l6 -6" /></symbol>
   <symbol id="t-arrow-right" viewBox="0 0 24 24"><path d="M5 12l14 0" /><path d="M13 18l6 -6" /><path d="M13 6l6 6" /></symbol>
@@ -312,23 +317,26 @@ body.maponly .map { max-width: none; border-radius: 0; }
     <h1>CS 차곡 화면 흐름</h1>
     <p>썸네일을 누르면 왼쪽 폰이 그 화면으로 이동해요.</p>
     <ul class="notes">
-      <li>CS 차곡은 CS 전공면접 기출 책을 휴대폰으로 공부하는 개인 공부 앱이에요. 면접 연습 앱이 아니라서 면접관·응시·채점 연출은 없어요</li>
+      <li>CS 차곡은 CS 교재 내용을 휴대폰으로 공부하는 개인 공부 앱이에요. 면접 연습 앱이 아니라서 면접관·응시·채점 연출은 없어요</li>
       <li>기능은 docs/features.md 의 1차만 넣었어요. 검색·북마크·모의면접 모음·글자 크기·다크 모드는 나중, 공부 알림은 뺐어요</li>
       <li>서버와 로그인 없이 프론트만 만들어요. 읽음·헷갈림·마지막 위치는 기기 안 localStorage 에 저장해요(이 프로토타입도 실제로 저장, 처음엔 예시 진도)</li>
       <li>앱은 버셀에 공개 배포해서 책 문장·그림·예시 값은 넣지 않아요. 본문은 notes/ 의 우리 말 해설, 정지 그림은 illustrations/ 의 새 일러스트(지금은 A안 정돈된 도식)</li>
       <li>움직이는 설명은 시뮬레이션이에요. 책 그림 31개를 30개 화면으로 만들어요(Hash 저장과 충돌은 하나). 완성된 것은 sims/&lt;id&gt; 페이지를 폰 안에 그대로 띄우고, 아직인 것은 같은 틀에 제작 중으로 보여요(완성 여부는 make-data.py 를 다시 돌리면 갱신)</li>
       <li>질문 상세는 답을 가린 채 열려요. 먼저 떠올려 본 뒤 답 보기, 꼬리질문은 눌러서 펼치기, 헷갈림·이전·다음은 아래 막대에 둬요</li>
       <li>홈의 이어 읽기는 마지막으로 본 질문과 멈춘 단락을 기억해요. 링은 그 질문을 읽은 비율이에요</li>
-      <li>복습은 헷갈림 표시한 질문만 한 장씩 봐요. 이제 알아요는 목록에서 빼고, 아직 헷갈려요는 다음에 다시 나와요</li>
+      <li>복습 화면은 따로 두지 않아요(2026-11-14). 질문 아래 막대의 헷갈려요로 표시해 두고, 목차의 헷갈림만 칩(개수 표시)으로 그 질문만 모아 다시 읽어요. 알게 되면 질문 화면에서 다시 눌러 꺼요</li>
+      <li>홈의 랜덤 질문은 아무 질문이나 하나 답을 가린 채 열어 바로 떠올려 보게 해요. 바로 전에 나온 질문과 읽던 질문은 빼고, 안 읽은 질문이 조금 더 자주 나와요</li>
       <li>별은 기출 빈도 표시로만 써요. 주황 바탕 꼬리표에 진한 글자(흰 바탕 위 주황 글자는 대비가 모자라서 안 써요)</li>
-      <li>홈은 최종 시안 P 그대로예요(O 목록형 + N 이어 읽기 카드). 오른쪽 위 … × 자리는 호스트 앱 몫이고, 뒤로 화살표는 하위 화면에만 둬요</li>
+      <li>홈은 최종 시안 P 바탕이에요(O 목록형 + N 이어 읽기 카드). 위 막대는 모든 화면에 붙어 있어요: 왼쪽 앱 이름(누르면 홈), 오른쪽 홈 · 목차 · 시뮬레이션 탭(지금 있는 곳은 진한 글자 + 밑줄). 질문과 시뮬레이션 한 개 화면은 왼쪽만 뒤로 + 제목으로 바뀌고 탭은 그대로라 어디서든 한 번에 옮겨 가요. 단독 웹앱이라 오른쪽 위 … × 캡슐은 뺐고, 탭과 겹치는 홈의 목차 링크와 시뮬레이션 전체 보기 줄도 뺐어요</li>
+      <li>본문은 휴대폰에서 오래 읽기 좋게 17px, 줄 간격 1.75, 글자 #333d4b(흰 바탕 대비 11:1), 문단 사이 16px, 소제목 19px 굵게, 굵은 용어는 700. 표와 코드는 칸 안에서 옆으로 밀고, 그림은 카드 폭 끝까지 넓혀 그림 속 글자를 키워요</li>
       <li>바탕은 흰색·회색 면, 글자 파랑 #0E5CF4, 남색 버튼 #03257B, 글꼴 Pretendard. 오픽 앱 토큰 그대로, 라이트 테마만</li>
       <li>아이콘은 P와 같은 TDS mono(별, 화살표) + Tabler outline 한 세트예요</li>
       <li>390px 기준으로 만들고 360px 까지 넘침 없이 보여요. 누르는 곳은 44px 이상. 주소 끝에 ?only=1 이면 폰만(휴대폰에서 열 때), ?s=화면 id 로 시작 화면을 골라요</li>
     </ul>
     <div class="lane"><h2>처음 실행</h2><div class="row" data-lane="home0,|다시 열면,home"></div></div>
+    <div class="lane"><h2>위 막대 탭 (어느 화면에서나 한 번에)</h2><div class="row" data-lane="|홈 탭,home,|목차 탭,toc,|시뮬레이션 탭,sims,|질문에서도 같은 탭,q"></div></div>
     <div class="lane"><h2>읽기 흐름 (홈 → 질문)</h2><div class="row" data-lane="toc,q,qa,|홈 이어 읽기,resume,|목차 빈출순,star"></div></div>
-    <div class="lane"><h2>복습 (홈 → 복습할 질문)</h2><div class="row" data-lane="review,reviewOpen,reviewDone,|헷갈림 0개,reviewEmpty"></div></div>
+    <div class="lane"><h2>헷갈림 거르기 (목차 → 헷갈림만)</h2><div class="row" data-lane="toc,conf,|헷갈림 0개,confEmpty"></div></div>
     <div class="lane"><h2>시뮬레이션 (홈 · 질문에서)</h2><div class="row" data-lane="sims,sim,|아직 만드는 중,simWip"></div></div>
   </div>
 </div>
@@ -361,8 +369,13 @@ const ti = (id, n = 24) => `<svg class="ti" width="${n}" height="${n}" aria-hidd
 const star = (n, label = `별 ${n}개`) => n ? `<span class="hotx num" aria-label="${label}">${ic('i-star', 12)}${n}</span>` : '';
 const to = r => `href="${r}" data-go="${r}"`;
 const CHEV = ic('i-chev');
-const CAP = `<span class="cap" aria-hidden="true"><svg class="ti" width="20" height="20" style="stroke-width:2.6"><use href="#t-dots"/></svg><svg class="ti" width="18" height="18" style="stroke-width:2.2"><use href="#t-x"/></svg></span>`;
-const subNav = (title, parent) => `<header class="nav sub"><button class="back" data-act="back" data-parent="${parent}" aria-label="뒤로">${ic('i-chev', 20)}</button><b>${title}</b>${CAP}</header>`;
+// 위 막대: 왼쪽은 앱 이름(홈, 목차, 시뮬레이션 목록) 또는 뒤로 + 제목(질문, 시뮬레이션), 오른쪽은 어느 화면에서나 같은 탭
+const TABS = [['home', '홈'], ['toc', '목차'], ['sims', '시뮬레이션']];
+const topNav = (tab, title, parent) => `<header class="nav${title ? ' sub' : ''}">${title
+  ? `<button class="back" data-act="back" data-parent="${parent}" aria-label="뒤로">${ic('i-chev', 20)}</button><b>${title}</b>`
+  : `<a class="brand" ${to('#/home')}>CS 차곡</a>`}<nav class="tabs" aria-label="주요 화면">${TABS.map(([k, n]) => `<a ${to('#/' + k)}${k === tab ? ` aria-current="${title ? 'true' : 'page'}"` : ''}>${n}</a>`).join('')}</nav></header>`;
+// 목차 칩 줄: 지금 칩이 화면 밖이면 보이도록 옆으로 민다
+const showChip = root => { const c = root.querySelector('.chip[aria-current]'); if (c) c.parentNode.scrollLeft = c.offsetLeft + c.offsetWidth + 12 - c.parentNode.clientWidth; };
 const firstPara = html => { const t = document.createElement('template'); t.innerHTML = html; return (t.content.querySelector('p') || t.content).textContent; };
 
 // ===== 저장: 읽음, 헷갈림, 마지막 위치 (localStorage). 처음 열면 P 시안과 같은 예시 진도 =====
@@ -408,8 +421,8 @@ function home() {
   const L = S.last && Q[S.last.id] ? S.last : { id: ORDER.find(id => !isRead(id)) || ORDER[0], pct: 0, text: '' };
   const q = Q[L.id];
   const freq = D.questions.filter(x => x.stars).sort((a, b) => b.stars - a.stars || isRead(a.id) - isRead(b.id) || a.i - b.i);
-  return `<div class="page"><header class="nav"><b>CS 차곡</b>${CAP}</header>
-  <main>
+  return `<div class="page">${topNav('home')}
+  <main><h1 class="sr">CS 차곡</h1>
     <section class="grp hero" aria-label="${first ? '처음 읽을 질문' : '읽던 질문'}">
       <div class="hero-top">
         <div><small>${first ? '처음 읽을 질문' : '읽던 질문'}</small><p class="num">${SUB[q.s].name} ${nth(q)}번째 질문</p></div>
@@ -420,18 +433,17 @@ function home() {
       <a class="cta" ${to(first ? '#/q/' + q.id : '#/q/' + q.id + '/resume')}>${first ? '첫 질문 읽기' : '이어 읽기'}</a>
     </section>
 
-    <section class="grp rv">
-      <a class="lr" ${to('#/review')}>
-        <span class="as">${ti('t-repeat')}</span>
-        <span class="tx"><b>복습할 질문</b><small>헷갈림 표시한 질문만 다시 봐요</small></span>
-        <span class="rt"><span class="cnt num">${S.confused.length}<span>개</span></span>${ic('i-chev', 18)}</span>
+    <section class="grp rnd">
+      <a class="lr" ${to('#/random')}>
+        <span class="as">${ti('t-arrows-shuffle')}</span>
+        <span class="tx"><b>랜덤 질문</b><small>아무 질문이나 꺼내 바로 떠올려 봐요</small></span>
+        <span class="rt">${ic('i-chev', 18)}</span>
       </a>
     </section>
 
     <section class="grp">
       <div class="lh">
         <div><h2>과목</h2><p class="num">${ORDER.length}문항 중 ${S.read.length}문항 읽음</p></div>
-        <a ${to('#/toc')}>목차${CHEV}</a>
       </div>
       ${D.subjects.map(s => {
         const qs = inSub(s.key), r = qs.filter(x => isRead(x.id)).length, c = qs.filter(x => isConf(x.id)).length;
@@ -454,20 +466,21 @@ function home() {
     <section class="grp">
       <div class="lh"><div><h2>동작으로 보기</h2><p>그림으로 따라가는 개념</p></div></div>
       <div class="hs">${HOME_SIMS.map(([id, t]) => simTile(SIM[id], t)).join('')}</div>
-      <a class="lr" ${to('#/sims')}>
-        <span class="tx"><b>시뮬레이션 전체 보기</b><small>과목별로 모두 보기</small></span>
-        <span class="rt">${CHEV}</span>
-      </a>
     </section>
   </main></div>`;
 }
 
 function toc(f) {
-  const chips = [['all', '전체'], ...D.subjects.map(s => [s.key, s.name]), ['star', ic('i-star', 14) + '빈출순']];
+  const chips = [['all', '전체'], ...D.subjects.map(s => [s.key, s.name]), ['star', ic('i-star', 14) + '빈출순'], ['conf', `헷갈림만<span class="num">${S.confused.length}</span>`]];
   let body;
   if (f === 'star') {
     const list = D.questions.filter(q => q.stars).sort((a, b) => b.stars - a.stars || a.i - b.i);
     body = `<section class="grp"><div class="lh"><div><h2>자주 나온 질문</h2><p class="num">별 많은 순, ${list.length}문항 중 ${list.filter(q => isRead(q.id)).length}문항 읽음</p></div></div>${list.map(freqRow).join('')}</section>`;
+  } else if (f === 'conf') {
+    // 헷갈림 표시한 질문만, 책 순서로 (복습 화면 대신)
+    const list = D.questions.filter(q => isConf(q.id));
+    body = list.length ? `<section class="grp"><div class="lh"><div><h2>헷갈림 표시한 질문</h2><p class="num">${list.length}문항, 알게 되면 질문에서 표시를 꺼요</p></div></div>${list.map(relRow).join('')}</section>`
+      : `<section class="grp empty"><span class="as">${ti('t-circle-check', 28)}</span><h2>헷갈린 질문이 없어요</h2><p>질문을 읽다가 아래 막대의 헷갈려요를 누르면 여기에 모여요.</p></section>`;
   } else {
     body = D.subjects.filter(s => f === 'all' || s.key === f).map(s => {
       const qs = inSub(s.key);
@@ -475,16 +488,16 @@ function toc(f) {
         ${s.subs.map(sub => `<h3 class="sub-h">${esc(sub)}</h3>${qs.filter(q => q.sub === sub).map(qRow).join('')}`).join('')}</section>`;
     }).join('');
   }
-  return `<div class="page">${subNav('목차', '#/home')}
+  return `<div class="page">${topNav('toc')}
   <nav class="chips" aria-label="목차 보기 방식">${chips.map(([k, n]) => `<a class="chip" ${to('#/toc' + (k === 'all' ? '' : '/' + k))} data-replace${k === f ? ' aria-current="page"' : ''}>${n}</a>`).join('')}</nav>
-  <main>${body}</main></div>`;
+  <main><h1 class="sr">목차</h1>${body}</main></div>`;
 }
 
 // mode: 없음 = 답 가림, open = 답 펼침, resume = 펼치고 멈춘 단락으로
 function question(id, mode) {
   const q = Q[id], prev = ORDER[q.i - 1], next = ORDER[q.i + 1], open = mode === 'open' || mode === 'resume';
   if (open) setIn('read', id, true);
-  return `<div class="page has-bar">${subNav(SUB[q.s].name, '#/toc/' + q.s)}
+  return `<div class="page has-bar">${topNav('toc', SUB[q.s].name, '#/toc/' + q.s)}
   <main>
     <section class="grp qh"><small>${esc(q.sub)}</small><h1>${star(q.stars)}${esc(q.title)}</h1></section>
     <section class="grp">
@@ -509,8 +522,8 @@ function question(id, mode) {
 const confBtn = id => `<button class="btn sub" data-act="confuse" data-q="${id}" aria-pressed="${isConf(id)}">${isConf(id) ? ti('t-check', 20) + '헷갈림' : ti('t-help-circle', 20) + '헷갈려요'}</button>`;
 
 function simsList() {
-  return `<div class="page">${subNav('시뮬레이션', '#/home')}
-  <main>${D.subjects.map(s => {
+  return `<div class="page">${topNav('sims')}
+  <main><h1 class="sr">시뮬레이션</h1>${D.subjects.map(s => {
     const list = D.sims.filter(x => x.s === s.key);
     return `<section class="grp"><div class="lh"><div><h2>${s.name}</h2><p class="num">${list.length}개</p></div></div><div class="grid">${list.map(x => simTile(x)).join('')}</div></section>`;
   }).join('')}</main></div>`;
@@ -535,7 +548,7 @@ function sim(id) {
         <p class="help">완성되면 값을 넣고 바로 결과를 볼 수 있어요.</p>
       </div>
     </section>`;
-  return `<div class="page">${subNav('시뮬레이션', '#/sims')}
+  return `<div class="page">${topNav('sims', '시뮬레이션', '#/sims')}
   <main>
     <section class="grp qh"><small>${SUB[x.s].name}</small><h1>${esc(x.title)}</h1></section>
     ${frame}
@@ -543,45 +556,13 @@ function sim(id) {
   </main></div>`;
 }
 
-// 복습: 들어올 때의 헷갈림 목록을 한 장씩. mode: open = 답 펼친 카드, done = 한 바퀴 끝
-let rv = null;
-function review(mode) {
-  if (!rv) { rv = { list: S.confused.slice(), i: 0, shown: mode === 'open' }; if (mode === 'done') rv.i = rv.list.length; }
-  const nav = subNav('복습', '#/home');
-  if (!S.confused.length) return `<div class="page">${nav}
-    <main><section class="grp empty">
-      <span class="as">${ti('t-circle-check', 28)}</span>
-      <h2>복습할 질문이 없어요</h2>
-      <p>질문을 읽다가 헷갈려요를 누르면 여기에 모여요.</p>
-      <a class="cta" ${to('#/toc')}>목차 보기</a>
-    </section></main></div>`;
-  if (rv.i >= rv.list.length) return `<div class="page">${nav}
-    <main><section class="grp empty">
-      <span class="as">${ti('t-repeat', 28)}</span>
-      <h2>한 바퀴 다 봤어요</h2>
-      <p class="num">아직 헷갈리는 질문이 ${S.confused.length}개 남아 있어요.</p>
-      <button class="cta" data-act="again">다시 보기</button>
-    </section></main></div>`;
-  const q = Q[rv.list[rv.i]];
-  return `<div class="page">${nav}
-  <main><section class="grp card rise" aria-label="복습 카드">
-    <div class="card-top"><span>${SUB[q.s].name}</span><span class="num">${rv.i + 1} / ${rv.list.length}</span></div>
-    <h2>${star(q.stars)}${esc(q.title)}</h2>
-    ${rv.shown ? `<div class="core prose rise">${q.core}</div>
-      <a class="more" ${to('#/q/' + q.id)}>본문 전체 보기${CHEV}</a>
-      <div class="duo"><button class="btn line" data-act="still">아직 헷갈려요</button><button class="btn pri" data-act="know">이제 알아요</button></div>`
-    : `<button class="cta" data-act="peek">답 보기</button>`}
-  </section></main></div>`;
-}
-
-// 경로 → [화면 id, html]. 화면 id 는 폰 안 section 의 data-id
+// 경로 → [화면 id, html]. 화면 id 는 폰 안 section 의 data-id. 랜덤 질문(#/random)은 go 가 질문 주소로 바꿔 넘긴다
 function view(route) {
   const [r, a, b] = route.replace(/^#\/?/, '').split('/');
-  if (r === 'toc') return a === 'star' ? ['star', toc('star')] : ['toc', toc(['ds', 'os', 'db', 'net'].includes(a) ? a : 'all')];
+  if (r === 'toc') return a === 'star' ? ['star', toc('star')] : a === 'conf' ? [S.confused.length ? 'conf' : 'confEmpty', toc('conf')] : ['toc', toc(['ds', 'os', 'db', 'net'].includes(a) ? a : 'all')];
   if (r === 'q' && Q[a]) return [b === 'resume' ? 'resume' : b === 'open' ? 'qa' : 'q', question(a, b)];
   if (r === 'sims') return ['sims', simsList()];
   if (r === 'sim' && SIM[a]) return [SIM[a].ready ? 'sim' : 'simWip', sim(a)];
-  if (r === 'review') { const html = review(a); return [!S.confused.length ? 'reviewEmpty' : rv.i >= rv.list.length ? 'reviewDone' : rv.shown ? 'reviewOpen' : 'review', html]; }
   return [S.last ? 'home' : 'home0', home()];
 }
 
@@ -596,10 +577,8 @@ const SCREENS = [
   ['qa', '답 펼침', '#/q/ds-collision/open'],
   ['resume', '이어 읽기', '#/q/db-transaction/resume'],
   ['star', '빈출순', '#/toc/star'],
-  ['review', '복습', '#/review'],
-  ['reviewOpen', '복습 답 보기', '#/review/open'],
-  ['reviewDone', '한 바퀴 끝', '#/review/done'],
-  ['reviewEmpty', '복습 빈 상태', '#/review', 'cleared'],
+  ['conf', '헷갈림만', '#/toc/conf'],
+  ['confEmpty', '헷갈림 0개', '#/toc/conf', 'cleared'],
   ['sims', '시뮬레이션 목록', '#/sims'],
   ['sim', '시뮬레이션', '#/sim/hash-table'],
   ...(WIP ? [['simWip', '제작 중', '#/sim/' + WIP.id]] : []),
@@ -618,6 +597,7 @@ function paint(route) {
   scr.querySelector('.scroll').innerHTML = html;
   phone.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s === scr));
   document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('cur', t.dataset.id === id));
+  showChip(scr);
   cur = { route, id };
 }
 // 이어 읽기면 멈춘 단락으로, 아니면 y 로
@@ -629,15 +609,23 @@ function land(y) {
 }
 // 질문 화면을 떠날 때: 읽던 위치(스크롤 %, 화면 맨 위에 보이는 단락, 꼬리질문 답 포함)를 저장
 function leave() {
-  if (cur.id.startsWith('review')) rv = null;
   if (!['q', 'qa', 'resume'].includes(cur.id)) return;
   const el = sc(), max = el.scrollHeight - el.clientHeight, top = el.getBoundingClientRect().top;
   const p = [...el.querySelectorAll('.prose p')].find(p => p.getBoundingClientRect().height && p.getBoundingClientRect().bottom - top > 72);
   S.last = { id: cur.route.split('/')[2], pct: max > 0 ? Math.min(100, Math.round(el.scrollTop / max * 100)) : 0, text: p ? p.textContent : '' };
   save();
 }
+// 랜덤 질문: 바로 전에 나온 질문과 읽던 질문은 빼고, 안 읽은 질문을 조금 더 자주(70%)
+let lastPick = null;
+function pick() {
+  const all = ORDER.filter(id => id !== lastPick && id !== (S.last && S.last.id));
+  const unread = all.filter(id => !isRead(id));
+  const pool = unread.length && Math.random() < 0.7 ? unread : all;
+  return lastPick = pool[Math.floor(Math.random() * pool.length)];
+}
 function go(route, replace) {
   leave();
+  if (route === '#/random') route = '#/q/' + pick();
   if (!replace) stack.push({ route: cur.route, y: sc().scrollTop });
   paint(route); land(0);
 }
@@ -649,7 +637,7 @@ function back(parent) {
 // 장면 바꾸기: 썸네일, 상태 버튼
 function scene(route, state) {
   S = STATES[state || 'seed'](); save();
-  rv = null; stack = [];
+  stack = [];
   paint(route); land(0);
 }
 
@@ -666,10 +654,6 @@ const ACT = {
   reveal: () => setAnswer(true),
   hide: () => setAnswer(false),
   confuse: b => { const id = b.dataset.q; setIn('confused', id, !isConf(id)); b.outerHTML = confBtn(id); phone.querySelector('.screen.on [data-act="confuse"]').focus(); },
-  peek: () => { rv.shown = true; paint(cur.route); },
-  know: () => { setIn('confused', rv.list[rv.i], false); rv.i++; rv.shown = false; paint(cur.route); land(0); },
-  still: () => { rv.i++; rv.shown = false; paint(cur.route); land(0); },
-  again: () => { rv = null; paint('#/review'); land(0); },
 };
 document.addEventListener('click', e => {
   const t = e.target.closest('.thumb');
@@ -691,12 +675,12 @@ document.addEventListener('keydown', e => {
 const live = S;
 quiet = true;
 SCREENS.forEach(([id, , route, state]) => {
-  S = STATES[state || 'seed'](); rv = null;
+  S = STATES[state || 'seed']();
   const [vid, html] = view(route);
   if (vid !== id) console.warn('장면과 화면 id 가 다름', id, vid);
   screenOf(id).querySelector('.scroll').innerHTML = html;
 });
-quiet = false; S = live; rv = null;
+quiet = false; S = live;
 document.querySelectorAll('[data-lane]').forEach(row => {
   row.innerHTML = row.dataset.lane.split(',').map((id, i, a) => {
     if (id[0] === '|') return `<span class="branch">${id.slice(1)}</span>`;
@@ -708,6 +692,7 @@ document.querySelectorAll('.thumb').forEach(t => {
   const s = screenOf(t.dataset.id).cloneNode(true);
   s.setAttribute('inert', ''); s.removeAttribute('aria-label');
   t.querySelector('.tf').replaceChildren(s);
+  showChip(s);
 });
 
 // 시작: ?s=화면 id 면 그 장면, 아니면 저장된 진도로 홈. ?only=1 폰만, ?map=1 지도만

@@ -1,0 +1,1440 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CS 차곡 v2 화면 흐름</title>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="CS 차곡">
+<meta property="og:description" content="CS 전공 40문항을 해설과 시뮬레이션으로 공부해요">
+<meta property="og:image" content="brand/og.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+/* ===== 토큰: spec/00-system.md 3절 그대로 (숫자의 원본은 그 문서) ===== */
+:root {
+  --bg: #FFFFFF; --band: #F2F4F6; --line: #E5E8EB;
+  --ink: #191F28; --ink-read: #333D4B; --ink-2: #4E5968; --ink-3: #6B7684; --ink-off: #8B95A1; --glyph-off: #B0B8C1;
+  --accent: #6194F8; --accent-text: #0E5CF4; --stage: #EAF1FE; --track: #E1EAFD;
+  --cta: #03257B; --cta-off: #D5D8DE;
+  --star-bg: #FFE0B0; --star-ink: #191F28; --conf-bg: #FFEEEE; --conf-ink: #D22030; --conf: #F04452;
+  --shadow-s: 0 0 4px rgba(2,32,71,.05), 0 4px 16px rgba(2,32,71,.05);
+  --shadow-m: 0 8px 16px rgba(0,27,55,.1), 0 4px 8px rgba(2,32,71,.05);
+  --hair: inset 0 0 0 1px rgba(0,27,55,.1);
+  --out: cubic-bezier(.22,1,.36,1); --std: cubic-bezier(.4,0,.2,1); --prs: cubic-bezier(.25,.46,.45,.94); --pop: cubic-bezier(.34,1.56,.64,1);
+  --fade: 120ms; --micro: 160ms; --base: 240ms;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  color: var(--ink); color-scheme: light; -webkit-font-smoothing: antialiased;
+  word-break: keep-all; overflow-wrap: break-word;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; background: #DADDE3; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, p, ul, ol, figure { margin: 0; }
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.ic.f { fill: currentColor; stroke: none; }
+.btn, .tag, .hm, .hs, .segc, .jump, .bar, .card, .tw, .simc { -webkit-user-select: none; user-select: none; } /* 버튼·탭·카드 글만. 본문은 선택·복사 허용 (00 4.10) */
+
+/* 글자 토큰 10개 (00 3.2) */
+.t-display { font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.02em; }
+.t-title1 { font-size: 24px; line-height: 32px; font-weight: 700; letter-spacing: -0.02em; }
+.t-title2 { font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.t-head { font-size: 19px; line-height: 28px; font-weight: 650; letter-spacing: -0.02em; }
+.t-core { font-size: 18px; line-height: 30px; font-weight: 510; letter-spacing: -0.015em; }
+.t-read { font-size: 17px; line-height: 30px; font-weight: 400; letter-spacing: -0.01em; }
+.t-row { font-size: 17px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; }
+.t-ui { font-size: 15px; line-height: 22px; font-weight: 510; letter-spacing: -0.01em; }
+.t-label { font-size: 13px; line-height: 18px; font-weight: 600; }
+.t-caption { font-size: 12px; line-height: 16px; font-weight: 600; }
+.t-title1, .t-title2, .t-head { text-wrap: balance; }
+.c-ink { color: var(--ink); } .c-2 { color: var(--ink-2); } .c-3 { color: var(--ink-3); } .c-a { color: var(--accent-text); }
+
+/* ===== 앱 틀 ===== */
+.screen { position: absolute; inset: 0; display: none; overflow: hidden; background: var(--bg); }
+.screen.on { display: block; }
+.scroll { height: 100%; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; scroll-behavior: auto; }
+.scroll::-webkit-scrollbar { display: none; }
+.scroll.has-bar { padding-bottom: 0; }
+.tail-space { height: 40px; }
+.has-bar .tail-space { height: calc(var(--barh, 76px) + 24px); }
+.sent { height: 1px; margin-top: -1px; }
+
+/* H-main (00 5.1) */
+.hm { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: var(--sat, env(safe-area-inset-top)); transition: transform var(--base) var(--out); }
+.hm .r1 { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 20px; }
+.mark { width: 24px; height: 24px; flex: none; }
+.hm .r2 { position: relative; height: 48px; display: flex; align-items: stretch; gap: 24px; padding: 0 20px; transition: box-shadow var(--micro) var(--std); }
+.hm .r2 a { position: relative; display: flex; align-items: center; justify-content: center; min-width: 44px; padding: 0 12px; margin: 0 -12px; color: var(--ink-off); white-space: nowrap; }
+.hm .r2 a[aria-current] { color: var(--ink); }
+.hm .r2 .ul { position: absolute; left: 0; bottom: 0; height: 2px; width: 10px; background: var(--ink); transform-origin: 0 0; transition: transform var(--base) var(--out); }
+.hm.cl { transform: translateY(-44px); }
+.hm.cl .r2 { box-shadow: 0 1px 0 var(--line); }
+
+/* H-sub */
+.hs { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: var(--sat, env(safe-area-inset-top)); }
+.hs .row1 { height: 52px; display: flex; align-items: center; padding: 0 12px 0 4px; }
+.ib { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 12px; color: var(--ink); transition: transform var(--micro) var(--prs); }
+.ib .ic { width: 24px; height: 24px; }
+.ib:active { transform: scale(.97); background: var(--band); }
+.hs .sub { margin-left: 2px; margin-right: auto; color: var(--ink-2); white-space: nowrap; }
+.stabs { display: flex; }
+.stabs a { position: relative; height: 44px; min-width: 44px; padding: 0 8px; display: flex; align-items: center; justify-content: center; color: var(--ink-3); white-space: nowrap; }
+.stabs a[aria-current] { color: var(--ink); }
+.stabs a[aria-current]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 6px; height: 2px; border-radius: 1px; background: var(--ink); }
+.hs .prog { height: 8px; padding: 0 20px 4px; }
+
+/* 진행 칸 (00 5.6) */
+.seg { display: flex; gap: 4px; flex: 1; min-width: 0; }
+.seg i { position: relative; flex: 1; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.seg i b { position: absolute; inset: 0; background: var(--accent); transform-origin: 0 50%; transform: scaleX(var(--f, 0)); transition: transform var(--base) var(--out); }
+@keyframes segfill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.seg.cont { gap: 0; }
+.seg.cont i { border-radius: 0; }
+.seg.cont i:first-child { border-radius: 2px 0 0 2px; }
+.seg.cont i:last-child { border-radius: 0 2px 2px 0; }
+
+/* 섹션, 띠 */
+.sec { padding: 24px 20px 32px; }
+.band { height: 8px; background: var(--band); }
+.sh { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; margin-bottom: 12px; }
+.sh .ib { margin: -8px -10px -8px 0; }
+.lnk { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-height: 44px; min-width: 44px; color: var(--accent-text); white-space: nowrap; }
+.lnk.t-label { margin-block: -13px; } .lnk.t-ui { margin-block: -11px; }
+.lnk .ic { width: 16px; height: 16px; }
+
+/* 카드 (00 5.9) */
+.card { display: block; border-radius: 16px; background: var(--bg); box-shadow: var(--hair); overflow: hidden; transition: transform var(--micro) var(--prs); }
+.card:active, .tw:active, .simc:active { transform: scale(.97); }
+.card .bd { padding: 20px; }
+
+/* 버튼 (00 5.2) */
+.btn { min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border-radius: 14px; font-size: 17px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; transition: transform var(--micro) var(--prs), filter var(--micro) var(--std), background-color var(--micro) var(--std); }
+.btn.l { min-height: 56px; width: 100%; }
+.btn.pri { background: var(--cta); color: #fff; }
+.btn.sec { background: var(--band); color: var(--ink); }
+.btn.del { background: var(--conf-ink); color: #fff; }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn.pri:active:not(:disabled) { filter: brightness(.92); }
+.btn.pri:disabled { background: var(--cta-off); }
+.btn.sec:disabled { background: var(--band); color: var(--glyph-off); }
+.btn .ic { width: 20px; height: 20px; }
+.btn.ico { width: 52px; flex: none; padding: 0; }
+.fake { pointer-events: none; }
+
+/* 꼬리표 (00 5.3) */
+.tag { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 8px; border-radius: 6px; font-size: 13px; line-height: 18px; font-weight: 600; white-space: nowrap; vertical-align: middle; }
+.tag .ic { width: 12px; height: 12px; }
+.tag.star { background: var(--star-bg); color: var(--star-ink); }
+.tag.conf { background: var(--conf-bg); color: var(--conf-ink); }
+.tag.here { background: var(--stage); color: var(--accent-text); }
+
+/* 상태 글리프 (00 5.4) */
+.gl { position: relative; width: 20px; height: 20px; flex: none; }
+.gl::before { content: ""; position: absolute; inset: 2px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--glyph-off); }
+.gl.ing::before { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.gl.ing::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: conic-gradient(var(--accent) calc(var(--p) * 1turn), transparent 0); }
+.gl.done::before { background: var(--accent-text); box-shadow: none; }
+.gl.done svg { position: absolute; inset: 5px; width: 10px; height: 10px; color: #fff; stroke-width: 3; }
+
+/* 차곡 블록 (00 5.5) */
+.blk { position: relative; height: 8px; border-radius: 4px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.blk.r { background: var(--accent); box-shadow: none; }
+.blk.i { background: var(--track); box-shadow: none; }
+.blk.i::before { content: ""; position: absolute; inset: 0; background: var(--accent); transform-origin: 0 50%; transform: scaleX(var(--p)); }
+.blk.c::after { content: ""; position: absolute; inset: 0; border-radius: 4px; box-shadow: inset 0 0 0 2px var(--conf); }
+.blk.pop { animation: pop var(--base) var(--pop) both; }
+@keyframes pop { from { transform: scale(.5); opacity: 0; } }
+.brow { display: flex; gap: 4px; }
+.brow .blk { flex: 1; max-width: 24px; }
+
+/* 목록 행 (00 5.8) */
+.row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 20px; transition: background-color var(--micro) var(--std); }
+.row:active { background: var(--band); }
+.row .gl { margin-top: 3px; }
+.row .tx { flex: 1; min-width: 0; }
+.row .tx b { display: block; font-size: 17px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+.row .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; color: var(--ink-3); }
+.row.reading { background: var(--stage); }
+.row.reading .meta { color: var(--ink-2); }
+.row .ri { width: 20px; height: 20px; margin-top: 3px; color: var(--ink-2); }
+.row.off { pointer-events: none; }
+.row.off .tx b, .row.off .ri { color: var(--ink-off); }
+.rows { margin: 0 -20px; }
+@media (hover: hover) { .row:hover { background: var(--band); } .row.reading:hover { background: var(--stage); } }
+
+/* 분할 선택 (00 5.7) */
+.segc { position: relative; display: flex; height: 44px; padding: 0 4px; border-radius: 22px; background: var(--band); }
+.segc button { position: relative; z-index: 1; flex: 1; min-width: 0; height: 44px; padding: 0 8px; color: var(--ink-2); white-space: nowrap; }
+.segc button[aria-selected="true"] { color: var(--ink); }
+.segc .th { position: absolute; top: 4px; left: 4px; height: 36px; width: calc((100% - 8px) / var(--n)); border-radius: 18px; background: #fff; box-shadow: var(--shadow-s); transform: translateX(calc(var(--i) * 100%)); transition: transform var(--base) var(--out); }
+.segbar { padding: 8px 20px; }
+
+/* 장 이동 줄 */
+.jump { position: sticky; top: 48px; z-index: 4; height: 44px; display: flex; gap: 16px; padding: 0 20px; background: var(--bg); box-shadow: 0 1px 0 var(--line); overflow-x: auto; scrollbar-width: none; }
+.jump::-webkit-scrollbar { display: none; }
+.jump a { position: relative; flex: none; display: flex; align-items: center; color: var(--ink-2); }
+.jump a[aria-current] { color: var(--ink); }
+.jump a[aria-current]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--ink); }
+
+/* 안내 줄 (00 5.12) */
+.note { display: flex; align-items: flex-start; gap: 8px; margin: 8px 20px 0; padding: 12px 16px; border-radius: 12px; background: var(--band); color: var(--ink-2); }
+.note .ic { margin-top: 1px; }
+.note p { flex: 1; }
+.note .ib { width: 44px; height: 44px; margin: -12px -14px -12px 0; color: var(--ink-2); }
+.note .ib .ic { width: 16px; height: 16px; margin: 0; }
+
+/* 하단 막대 (00 5.10) */
+.bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; gap: 8px; padding: 12px 20px max(12px, var(--sab, env(safe-area-inset-bottom))); background: rgba(255,255,255,.94); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: 0 -1px 0 var(--line); }
+.bar .grow { flex: 1; min-width: 0; }
+.bar .grow2 { flex: 1.4; min-width: 0; }
+.cfb[aria-pressed="true"] { background: var(--conf-bg); color: var(--conf-ink); }
+.cfb .ic { transition: transform var(--base) var(--pop); }
+.cfb.popi .ic { animation: pop var(--base) var(--pop); }
+
+/* 알림 한 줄, 시트 (00 5.11, 5.13) */
+.toast { position: absolute; left: 50%; bottom: calc(var(--barh, 0px) + 12px); z-index: 8; width: max-content; max-width: calc(100% - 40px); display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: rgba(25,31,40,.92); color: #fff; box-shadow: var(--shadow-s); transform: translateX(-50%); animation: tin var(--base) var(--out) both; }
+.toast.nob { bottom: max(24px, calc(var(--sab, env(safe-area-inset-bottom)) + 12px)); }
+.toast.top { bottom: auto; top: var(--tt, 12px); animation-name: tdn; }
+@keyframes tdn { from { opacity: 0; transform: translate(-50%, -8px); } }
+.toast button { position: relative; min-height: 44px; min-width: 44px; margin-block: -11px; color: #fff; font-weight: 600; white-space: nowrap; }
+@keyframes tin { from { opacity: 0; transform: translate(-50%, 8px); } }
+.scrim { position: absolute; inset: 0; z-index: 9; background: rgba(25,31,40,.4); animation: fin var(--micro) var(--std) both; }
+@keyframes fin { from { opacity: 0; } }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; padding: 24px 20px max(20px, var(--sab, env(safe-area-inset-bottom))); border-radius: 24px 24px 0 0; background: var(--bg); box-shadow: var(--shadow-m); animation: sin var(--base) var(--out) both; }
+@keyframes sin { from { transform: translateY(100%); } }
+.sheet p { margin-top: 8px; }
+.sheet .bts { display: flex; gap: 8px; margin-top: 24px; }
+.sheet .bts .btn { flex: 1; }
+
+/* 일러스트 자리 (00 5.15) */
+.ill { position: relative; display: block; }
+.ill > svg { display: block; width: 100%; height: 100%; }
+.ill > .illimg { display: none; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.ill.has > .illimg { display: block; }
+.ill.has > svg { visibility: hidden; }
+
+/* ===== 홈 ===== */
+.hero .strip { position: relative; height: 120px; background: var(--stage); }
+.hero .strip .ill { position: absolute; inset: 0; }
+.hero .strip .ill > .illimg { object-fit: cover; object-position: center; }
+.hero .t-title2 { margin-top: 4px; }
+.posr { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.posr .t-label { flex: none; }
+.hero .btn { margin-top: 20px; }
+.hero.done .strip { height: 160px; background: var(--stage); } /* 다 읽음 탑은 세로로 긴 그림이라 띠를 키워 탑이 띠 높이의 75% 안팎으로 서게 */
+.rnd .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.rnd .t-row { margin-top: 8px; }
+.rnd .hid { display: flex; align-items: center; gap: 4px; margin-top: 16px; }
+.rnd .hid .ic { width: 16px; height: 16px; }
+.rnd .swap { transition: opacity var(--fade) var(--std); }
+.rnd .swap.out { opacity: 0; }
+.rnd .swap.in { animation: rise var(--base) var(--out) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+.sum { display: flex; align-items: baseline; gap: 2px; }
+.towers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.tw { display: flex; flex-direction: column; align-items: stretch; text-align: center; border-radius: 12px; transition: transform var(--micro) var(--prs); }
+.tw .stack { height: 140px; display: flex; flex-direction: column-reverse; gap: 4px; }
+.tw .ill { width: 32px; height: 32px; margin: 12px auto 0; }
+.tw .t-caption { margin-top: 4px; white-space: nowrap; color: var(--ink); }
+.tw .t-label { margin-top: 2px; white-space: nowrap; }
+.tw .cf { margin-top: 4px; color: var(--conf-ink); }
+.towers.stackin .blk { animation: drop var(--base) var(--out) both; animation-delay: calc(var(--k) * 24ms); }
+@keyframes drop { from { opacity: 0; transform: translateY(-8px); } }
+.hint { margin-top: 16px; }
+.simcard .pf { aspect-ratio: var(--ar); background: var(--stage); }
+.pst { display: block; width: 100%; height: 100%; }
+.pst.fade { -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+.nw { white-space: nowrap; }
+.revrow { margin-top: 16px; }
+.revrow .ri { color: var(--conf-ink); }
+.revrow .ri + .tx + .ri { color: var(--ink-3); }
+.simcard .nm { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.simcard .nm b { min-width: 0; }
+.dev .row { align-items: flex-start; }
+.dev .st { display: flex; align-items: center; gap: 4px; margin-top: 3px; white-space: nowrap; }
+.dev .st .ic { width: 16px; height: 16px; }
+
+/* 불러오는 중 자리 모양 (06 3.1): 움직이지 않음 */
+.ph { border-radius: 6px; background: var(--band); }
+
+/* ===== 목차 ===== */
+.ch { padding: 24px 20px 12px; }
+.ch .l1 { display: flex; align-items: center; gap: 12px; }
+.ch .l1 .ill { width: 48px; height: 48px; flex: none; }
+.ch .l1 .nm { flex: 1; min-width: 0; }
+.ch .l1 .tag { margin-top: 4px; }
+.ch .brow { margin-top: 12px; }
+.topic { padding: 20px 20px 4px; color: var(--ink-3); }
+.grp { display: flex; align-items: center; gap: 8px; padding: 24px 20px 4px; }
+.endnote { padding: 24px 20px 40px; text-align: center; color: var(--ink-2); }
+.endnote .lnk { margin: -9px 0 -13px; }
+.confsum { padding: 24px 20px 16px; }
+.confsum p { margin-top: 4px; }
+.confsum .btn { margin-top: 16px; }
+.empty { padding: 56px 20px 32px; text-align: center; }
+.empty .ill { width: 160px; height: 120px; margin: 0 auto 20px; }
+.empty p { margin-top: 8px; text-wrap: balance; }
+.empty .btn { display: inline-flex; margin-top: 24px; padding: 0 20px; }
+.empty .btn.l { display: flex; }
+.list-in .row { animation: rise var(--base) var(--out) both; animation-delay: calc(var(--k) * 24ms); }
+
+/* ===== 질문 ===== */
+.qh { padding: 20px 20px 0; }
+.qh .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.qh .top .l { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.qh .top .l span { text-wrap: balance; }
+.qh h1 { margin-top: 8px; outline: none; }
+.qh .info { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; }
+.scroll.qflex { display: flex; flex-direction: column; }
+.scroll.qflex > * { flex-shrink: 0; }
+.recall { flex: 1 0 auto; display: flex; flex-direction: column; min-height: 240px; margin: 24px 20px 0; padding: 20px; border-radius: 16px; background: var(--band); }
+.recall .mid { margin: auto 0; display: flex; flex-direction: column; align-items: center; padding: 16px 0 24px; text-align: center; }
+.recall .ill { width: 48px; height: 48px; margin-bottom: 16px; }
+.recall p { margin-top: 4px; text-wrap: balance; }
+.ans { padding: 24px 20px 0; }
+.ans.in { animation: rise var(--base) var(--out) both; }
+.coreh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.coreh .lnk { color: var(--ink-2); }
+mark { color: inherit; background: linear-gradient(transparent 62%, var(--track) 62%); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.chunk { view-timeline-axis: block; view-timeline-inset: 35% 0%; }
+.prose { color: var(--ink-read); font-size: 17px; line-height: 30px; letter-spacing: -0.01em; }
+.prose > .chunk:first-child > :first-child { margin-top: 0; }
+.prose .intro { padding-top: 24px; }
+.prose h3 { margin: 40px 0 0; font-size: 19px; line-height: 28px; font-weight: 650; letter-spacing: -0.02em; color: var(--ink); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.prose h3 + * { margin-top: 12px; }
+.prose p { margin: 16px 0 0; text-wrap: pretty; }
+.prose b { font-weight: 700; color: var(--ink); }
+.prose ul, .prose ol { margin: 16px 0 0; padding-left: 20px; }
+.prose li { margin-top: 8px; padding-left: 2px; }
+.prose ul > li::marker { color: var(--glyph-off); }
+.prose ol > li::marker { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.prose li ul, .prose li ol { margin-top: 8px; }
+.prose code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: .88em; padding: 2px 4px; border-radius: 6px; background: var(--band); color: var(--ink); }
+.prose pre { position: relative; margin: 20px 0 0; padding: 16px; border-radius: 12px; background: var(--band); overflow-x: auto; overflow-wrap: normal; word-break: normal; font-size: 14px; line-height: 22px; }
+.prose pre code { padding: 0; background: none; font-size: 14px; }
+.prose .tbl { margin: 20px 0 0; border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+.prose table { min-width: 100%; border-collapse: collapse; font-size: 15px; line-height: 22px; font-weight: 510; }
+.prose th, .prose td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); min-width: 96px; text-wrap: pretty; }
+.prose th { background: var(--band); font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.prose td:first-child { font-weight: 600; color: var(--ink); }
+.prose tr:last-child td { border-bottom: 0; }
+.fig { margin: 40px 0 12px; padding: 12px 0 4px; border-radius: 16px; background: var(--stage); overflow: hidden; }
+.fig svg { display: block; width: 100%; height: auto; }
+.simgo { display: flex; align-items: center; gap: 12px; min-height: 72px; margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--bg); box-shadow: var(--hair); transition: transform var(--micro) var(--prs); }
+.simgo:active { transform: scale(.97); }
+.simgo .pv { width: 64px; height: 48px; flex: none; border-radius: 6px; background: var(--stage); overflow: hidden; }
+.simgo .tx { flex: 1; min-width: 0; }
+.simgo .tx b { display: block; font-size: 17px; line-height: 26px; font-weight: 600; color: var(--ink); }
+.simgo > .ic { color: var(--accent-text); }
+.tails { padding: 24px 0 8px; }
+.tails h2 { padding: 0 20px 8px; }
+.tq { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 16px 20px; text-align: left; box-shadow: 0 1px 0 var(--line); }
+.tq:first-of-type { box-shadow: 0 -1px 0 var(--line), 0 1px 0 var(--line); }
+.tq span { flex: 1; }
+.tq .ic { margin-top: 3px; color: var(--ink-3); transition: transform var(--micro) var(--std); }
+.tq[aria-expanded="true"] .ic { transform: rotate(180deg); }
+.ta { padding: 4px 20px 20px; box-shadow: 0 1px 0 var(--line); animation: rise var(--base) var(--out) both; }
+.endz { padding: 24px 20px 32px; }
+.endz .l1 { display: flex; align-items: center; gap: 12px; }
+.endz .l2 { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.endz .l2 .lnk { color: var(--ink-2); }
+.endz .l2 .lnk.on { color: var(--accent-text); }
+.endz > .t-label { margin-top: 8px; }
+.here-in { animation: fin var(--base) var(--out) both; }
+
+/* ===== 시뮬레이션 ===== */
+.simgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 12px; padding: 0 20px 32px; }
+.simc { display: block; transition: transform var(--micro) var(--prs); }
+.simc .pf { aspect-ratio: 4 / 3; border-radius: 12px; background: var(--stage); overflow: hidden; }
+.simc .pf.ld { background: var(--stage); }
+.simc .t-row { margin-top: 12px; color: var(--ink); }
+.simc .tag { margin-top: 4px; }
+.simh { padding: 16px 20px 0; }
+.simh h1 { margin-top: 4px; outline: none; }
+.simh .segc { display: flex; margin-top: 16px; }
+.simh .segc button { flex: 1; padding: 0 8px; }
+.stage { position: relative; margin: 16px 20px 0; min-height: 240px; }
+.stage:not([data-stage]) { border-radius: 24px; background: var(--stage); overflow: hidden; }
+.stage[data-stage] { background: linear-gradient(var(--stage), var(--stage)) top / 100% 240px no-repeat; border-radius: 24px; }
+.stage iframe { display: block; width: 100%; height: 420px; border: 0; background: transparent; }
+.stage .msg { position: absolute; inset: 0; display: grid; place-content: center; gap: 4px; padding: 24px; text-align: center; }
+.stage .msg .acts { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 16px; }
+.stage .msg .btn { background: #fff; }
+.stage.figv { min-height: 0; padding-top: 16px; background: #fff; box-shadow: var(--hair); }
+.stage.figv svg { display: block; width: 100%; height: auto; }
+.related { padding: 24px 0 8px; }
+.related h2 { padding: 0 20px 8px; }
+.simbar { flex-direction: column; gap: 0; padding-top: 12px; }
+.simbar .st1 { display: flex; align-items: center; gap: 12px; min-height: 18px; }
+.simbar .cap { min-height: 60px; margin-top: 8px; color: var(--ink); }
+.simbar .st1 .lnk { margin-left: 4px; }
+.simbar .st1 .tag { flex: none; }
+.simbar .cap.swap { animation: rise var(--base) var(--out) both; }
+.simbar .bts { display: flex; gap: 8px; margin-top: 12px; }
+.capflow { display: none; margin: 16px 20px 0; color: var(--ink); }
+.capflow .lnk { margin-block: -11px; }
+.capflow [hidden] { display: none; }
+.capflow .tag { margin-bottom: 8px; }
+
+/* 낮은 화면(높이 700 미만): 시뮬레이션 위 줄을 숨기고 제목을 row 로 (05 4절) */
+@container (max-height: 699px) {
+  .simh > .t-label { display: none; }
+  .simh h1 { font-size: 17px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; margin-top: 0; }
+  .simbar .cap { min-height: 22px; font-size: 15px; line-height: 22px; font-weight: 510; }
+  .recall { min-height: 0; }
+  .recall .ill { display: none; }
+  .recall .mid { padding: 0 0 20px; }
+}
+/* 가로 모드(높이 500 미만): 머리 줄 1 을 처음부터 숨김 (00 4.8) */
+@container (max-height: 499px) {
+  .hm .r1 { display: none; }
+  .hm.cl { transform: none; }
+  .recall { margin-top: 16px; padding: 16px; }
+  .recall .mid { padding: 0 0 12px; }
+  .recall .mid p { display: none; }
+}
+/* 좁은 열(글자 200% 확대 등, 폭 340 미만): 막대 글을 줄이고 탭 줄은 옆으로 밀기 (00 10절) */
+@container (max-width: 339px) {
+  .hm .r2 { gap: 16px; overflow-x: auto; scrollbar-width: none; }
+  .hm .r2 a { font-size: 17px; line-height: 26px; }
+  .bar { flex-wrap: wrap; padding: 8px 12px max(8px, var(--sab, env(safe-area-inset-bottom))); }
+  .bar .btn { min-height: 48px; padding: 0 12px; gap: 4px; }
+  .bar .btn.ico { width: 48px; }
+  .bar .grow2 { flex-basis: 100%; }
+  .segc button { white-space: normal; font-size: 13px; line-height: 18px; font-weight: 600; text-wrap: balance; }
+  .simbar { padding-top: 8px; }
+  .simbar .st1 { flex-wrap: wrap; }
+  .simbar .cap, .simbar .st1 [data-k=try], .simbar .st1 .tag { display: none; }
+  .capflow { display: block; }
+  .simbar .bts { flex-wrap: wrap; margin-top: 8px; }
+  .simbar .bts .grow { flex-basis: 100%; }
+  .posr { flex-wrap: wrap; row-gap: 8px; }
+  .posr .seg { flex-basis: 100%; }
+  .towers { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 24px; }
+  .simgrid { grid-template-columns: minmax(0, 1fr); }
+  .hs, .hs.flow { position: relative; }
+  .hs .row1 { flex-wrap: wrap; height: auto; min-height: 52px; padding: 4px 12px 0 4px; }
+  .stabs { flex-basis: 100%; min-width: 0; padding-left: 4px; overflow-x: auto; scrollbar-width: none; }
+  .stage[data-stage] { overflow-x: auto; }
+  .stage iframe { min-width: 320px; }
+  .simcard .nm, .rnd .top { flex-wrap: wrap; }
+}
+/* 아주 낮은 화면(높이 600 미만, SE 사파리 툴바 펼침): 시뮬레이션 머리는 붙지 않고 같이 올라가 무대 자리를 늘린다 (05 4절) */
+@container (max-height: 599px) {
+  .hs.flow { position: relative; }
+}
+
+/* 움직임 줄이기 (00 9.2-8) */
+@media (prefers-reduced-motion: reduce) {
+  .screen *, .screen *::before, .screen *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+  .toast, .ans.in, .rnd .swap.in, .ta, .simbar .cap.swap { animation: fin var(--fade) var(--std) both !important; }
+}
+
+/* ===== 바깥 틀: 폰 + 흐름 지도 (오픽 final, p-flow 와 같은 형식) ===== */
+.desk { display: flex; gap: 40px; padding: 32px; align-items: flex-start; justify-content: center; }
+.left { position: sticky; top: 32px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+.phone { container-type: size; --pw: 390px; --ph: 844px; width: var(--pw); height: var(--ph); border-radius: 36px; overflow: hidden; position: relative; background: var(--bg); box-shadow: 0 0 0 10px #15171C, 0 30px 60px -20px rgba(0,0,0,.35); }
+.ctrl { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 420px; }
+.ctrl button { height: 34px; padding: 0 12px; border-radius: 17px; background: #fff; font-size: 13px; font-weight: 700; color: #333; box-shadow: inset 0 0 0 1px #C9CDD4; }
+.ctrl button[aria-pressed="true"] { background: #15171C; color: #fff; box-shadow: none; }
+.ctrl small { width: 100%; text-align: center; font-size: 12px; color: #555; }
+.phone.safe { --sat: 47px; --sab: 34px; }
+.phone.safe::before { content: ""; position: absolute; z-index: 20; top: 11px; left: 50%; width: 120px; height: 34px; margin-left: -60px; border-radius: 17px; background: #000; }
+.phone.safe::after { content: ""; position: absolute; z-index: 20; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: #191F28; }
+.states { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; padding: 16px; border-radius: 16px; background: #F7F8FA; }
+.states figure { display: flex; flex-direction: column; gap: 8px; font-size: 12px; font-weight: 700; color: #333; }
+.states .force-press { transform: scale(.97); }
+.states .btn.pri.force-press { filter: brightness(.92); }
+.states .force-focus { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.map { flex: 1; min-width: 0; max-width: 1180px; padding: 28px 28px 24px; border-radius: 20px; background: #fff; }
+.map h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; }
+.map > p { margin-top: 4px; font-size: 13px; color: #5C5F66; }
+.notes { margin: 8px 0 0 18px; padding-left: 22px; font-size: 13px; line-height: 1.6; color: #5C5F66; }
+.notes b { color: #333; }
+.lane { margin-top: 22px; }
+.lane h2 { margin-bottom: 10px; font-size: 13px; font-weight: 800; color: var(--accent-text); }
+.lane .rowx { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.arrow { width: 18px; font-size: 18px; font-weight: 700; text-align: center; color: #A3A8B0; }
+.thumb { cursor: pointer; border-radius: 12px; }
+.thumb .tf { position: relative; width: 117px; height: 253px; overflow: hidden; border-radius: 12px; background: #fff; box-shadow: 0 0 0 1px #DADDE3; }
+.thumb .tf .screen { width: 390px; height: 844px; transform: scale(.3); transform-origin: 0 0; display: block; pointer-events: none; }
+.thumb > span { display: block; width: 117px; margin-top: 6px; text-align: center; font-size: 12px; font-weight: 700; color: #333; }
+.thumb.cur .tf { box-shadow: 0 0 0 3px #6194F8; }
+.branch { padding: 6px 10px; border-radius: 8px; background: #F2F3F5; font-size: 12px; font-weight: 700; color: #5C5F66; }
+.brandrow { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.brandrow figure { display: flex; flex-direction: column; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; color: #333; }
+.brandrow img { display: block; border-radius: 12px; box-shadow: 0 0 0 1px #DADDE3; }
+body.only { background: var(--band); }
+body.only .desk { display: block; padding: 0; }
+body.only .map, body.only .ctrl { display: none; }
+body.only .left { position: static; }
+body.only .phone { width: min(100vw, 430px); height: 100dvh; margin: 0 auto; border-radius: 0; box-shadow: none; }
+@media (min-width: 431px) { body.only .phone { box-shadow: 0 0 0 1px var(--line); } }
+body.maponly .left { display: none; }
+body.maponly .desk { display: block; padding: 0; }
+body.maponly .map { max-width: none; border-radius: 0; }
+</style>
+</head>
+<body>
+<!-- 아이콘: Tabler Icons (MIT) 한 벌. 별만 star-filled -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6l-6 6l6 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6l-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M5 12l14 0"/><path d="M5 12l6 6"/><path d="M5 12l6 -6"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 12l14 0"/><path d="M13 18l6 -6"/><path d="M13 6l6 6"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M18 4l3 3l-3 3"/><path d="M18 20l3 -3l-3 -3"/><path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5"/><path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></symbol>
+  <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M10.585 10.587a2 2 0 0 0 2.829 2.828"/><path d="M16.681 16.673a8.717 8.717 0 0 1 -4.681 1.327c-3.6 0 -6.6 -2 -9 -6c1.272 -2.12 2.712 -3.678 4.32 -4.674m2.86 -1.146a9.055 9.055 0 0 1 1.82 -.18c3.6 0 6.6 2 9 6c-.666 1.11 -1.379 2.067 -2.138 2.87"/><path d="M3 3l18 18"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 16v.01"/><path d="M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5l10 -10"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13 -8z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M19 18a3.5 3.5 0 0 0 0 -7h-1a5 4.5 0 0 0 -11 -2a4.6 4.4 0 0 0 -2.1 8.4"/><path d="M12 13l0 9"/><path d="M9 19l3 3l3 -3"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M3.06 13a9 9 0 1 0 .49 -4.087"/><path d="M3 4.001v5h5"/><path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></symbol>
+  <symbol id="i-wifioff" viewBox="0 0 24 24"><path d="M12 18l.01 0"/><path d="M9.172 15.172a4 4 0 0 1 5.656 0"/><path d="M6.343 12.343a7.963 7.963 0 0 1 3.864 -2.14m4.163 .155a7.965 7.965 0 0 1 3.287 2"/><path d="M3.515 9.515a12 12 0 0 1 3.544 -2.455m3.101 -.92a12 12 0 0 1 10.325 3.374"/><path d="M3 3l18 18"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M8.243 7.34l-6.38 .925l-.113 .023a1 1 0 0 0 -.44 1.684l4.622 4.499l-1.09 6.355l-.013 .11a1 1 0 0 0 1.464 .944l5.706 -3l5.693 3l.1 .046a1 1 0 0 0 1.352 -1.1l-1.091 -6.355l4.624 -4.5l.078 -.085a1 1 0 0 0 -.633 -1.62l-6.38 -.926l-2.852 -5.78a1 1 0 0 0 -1.794 0l-2.853 5.78z"/></symbol>
+</svg>
+
+<div class="desk">
+  <div class="left">
+    <div class="phone" id="phone"></div>
+    <div class="ctrl" id="ctrl">
+      <button data-w="390" aria-pressed="true">390 x 844</button><button data-w="375">375 x 667</button><button data-w="360">360 x 780</button><button data-safe aria-pressed="false">노치 · 홈 표시줄</button>
+      <small>폭을 바꾸면 같은 장면을 그 기기 크기로 보여 줘요. 썸네일을 누르면 그 장면으로 가요</small>
+    </div>
+  </div>
+
+  <div class="map" id="map">
+    <h1>CS 차곡 v2 화면 흐름 (4회차)</h1>
+    <p>썸네일을 누르면 왼쪽 폰이 그 장면으로 이동해요. 폰 안은 실제로 눌러 볼 수 있어요. 설계 문서는 spec/00~06, 일러스트 자리는 illustrations.md</p>
+    <ul class="notes">
+      <li><b>공부 자료 앱</b>이에요. 면접 연출은 없고 별은 기출 빈도 표시로만 써요. 기능은 docs/features.md 1차 그대로(진도 초기화, 오프라인 저장 포함, 로그인·알림 없음)</li>
+      <li><b>수치의 원본은 spec/00-system.md 하나</b>예요. 글자 토큰 10개, 모서리 6 / 12 / 14 / 16 / 24 / 알약, 간격 2~56 단계, 시간 120 / 160 / 240ms, 이징 4개. 화면 문서는 토큰 이름만 불러요</li>
+      <li><b>홈은 그릇 두 가지</b>(헤어라인 카드, 선 없는 목록 행)만 써요. 남색은 이어 읽기 하나. 떠 있는 조각, 기울어진 카드 뭉치, 범례, 반복 미리보기는 뺐어요</li>
+      <li><b>답은 스스로 열 때만</b> 보여요. 홈·목차에는 발췌가 없고, 소제목 실마리와 꼬리질문도 답 보기 뒤에만 나와요. 떠올리기 판에는 가짜 막대가 없어요</li>
+      <li><b>버튼은 오픽 CTA 처럼 평평</b>해요(모서리 14, 립 없음). 누름은 모두 scale .97, 주 버튼만 바탕이 한 단계 어두워져요</li>
+      <li><b>상태 모델</b>: 읽기(안 읽음 / 읽는 중 / 읽음)와 헷갈림(켬 / 끔)은 따로예요. 블록은 읽기가 채움을, 헷갈림이 빨간 테두리를 정해요. 10 / 12 는 읽음 수, 헷갈림 개수는 따로 세요</li>
+      <li><b>위치와 개수를 글로 갈라요</b>: 분수는 읽은 수에만(읽음 4 / 9), 위치는 9개 중 5번째 · 빈출 20개 중 4번째 · 헷갈림 3개 중 2번째. 머리의 켜진 탭은 뒤로 갈 곳과 같아요(홈에서 연 질문은 홈)</li>
+      <li><b>이어 읽기</b>는 답을 펼치고 둘째 단락에 닿은 질문만 기억해요. 자동 읽음은 끝 영역이 보이고 답을 연 지 예상 시간의 30%(최소 10초)가 지나야 해요. 그 전에 끝에 오면 아직 쌓이지 않았다고 말하고 읽음으로 표시를 둬요. 읽음 취소도 있어요</li>
+      <li><b>목차</b>는 붙는 높이 92(접힌 머리 48 + 장 이동 줄 44). 장 이동 줄로 과목을 한 번에 옮겨요. 빈출순은 거르기라 이름을 빈출 20 으로 바꿨어요</li>
+      <li><b>시뮬레이션 포스터</b>는 자기 도식의 첫 묶음을 통째로 줄여 넣어요(자르지 않음, 높은 4개만 아래 흐림). 단계가 바뀌면 바뀐 물체(보임·class·글이 달라진 것, 부모 class 로 드러난 것 포함)가 하단 막대 위에 오게 스크롤해요. 자리보다 크면 새 물체를 먼저. 검사는 단계 전후 사진의 픽셀 차이로 따로 재요</li>
+      <li><b>말줄임은 어디에도 없어요.</b> 가장 긴 102자 제목도 그릇이 늘어나요. 40자를 넘는 질문 제목은 title-2. 실측 줄 수는 spec/00 8.1</li>
+      <li><b>플랫폼</b>: 안전 영역 env(), 100dvh, 최대 폭 430 가운데, theme-color #FFFFFF, 확대 허용, Tabler(MIT) 아이콘 한 벌. 앱 아이콘·파비콘·공유 이미지는 brand/</li>
+      <li><b>일러스트</b> 12장(장면 5, 기호 4, 상태 3). 다 읽음은 모든 칸이 파란 탑, 헷갈림 0 은 쌓인 카드와 체크, 못 불러옴은 빈 문서(구름은 오프라인일 때만). 파일이 없으면 같은 결의 면 그림 대체가 보여요</li>
+      <li>움직임은 바뀐 것만: 탑 쌓기(세션 1번), 새로 읽은 블록 pop, 답 펼침, 목록 교체, 단계 설명. 움직임 줄이기 설정이면 opacity 만 써요. 주소 끝 ?only=1&amp;s=장면 이면 폰만</li>
+    </ul>
+    <div id="lanes"></div>
+    <div class="lane"><h2>부품 상태: 누름 · 초점 · 꺼짐 (spec/00 5.2)</h2>
+      <div class="states">
+        <figure><span class="btn l pri">답 보기</span>주 버튼</figure>
+        <figure><span class="btn l pri force-press">답 보기</span>주 버튼 누름: scale .97 + 밝기 .92</figure>
+        <figure><span class="btn l pri force-focus">답 보기</span>키보드 초점: 2px 테두리</figure>
+        <figure><span class="btn l pri" style="background:var(--cta-off)">답 보기</span>주 버튼 꺼짐</figure>
+        <figure><span class="btn sec">헷갈려요</span>보조 버튼</figure>
+        <figure><span class="btn sec force-press">헷갈려요</span>보조 누름</figure>
+        <figure><span class="btn sec cfb" aria-pressed="true">헷갈려요</span>헷갈려요 켬</figure>
+        <figure><span class="btn sec" style="color:var(--glyph-off)">이전</span>보조 꺼짐: 바탕 그대로, 글만 흐리게</figure>
+        <figure><span class="card force-press" style="padding:16px" class="t-ui">카드</span>카드 누름: scale .97</figure>
+        <figure><span class="row" style="background:var(--band);margin:0;border-radius:12px"><b class="t-row">목록 행</b></span>행 누름: 바탕 --band</figure>
+      </div>
+    </div>
+    <div class="lane"><h2>브랜드 자산 (spec/00 11절)</h2>
+      <div class="brandrow">
+        <figure><img src="brand/icon-512.png" width="96" height="96" alt="앱 아이콘"><figcaption>앱 아이콘 512 · 180</figcaption></figure>
+        <figure><img src="brand/favicon.svg" width="32" height="32" alt="파비콘" style="border-radius:7px"><figcaption>파비콘 SVG</figcaption></figure>
+        <figure><img src="brand/og.png" width="380" height="200" alt="공유 미리보기"><figcaption>공유 미리보기 1200 x 630</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="illustrations/ready.js"></script>
+<script>
+// ===== 데이터 =====
+const D = window.DATA, Q = {}, SUB = {}, SIM = {};
+D.questions.forEach((q, i) => { q.i = i; Q[q.id] = q; });
+D.subjects.forEach(s => { SUB[s.key] = s; });
+D.sims.forEach(s => { SIM[s.id] = s; });
+const ORDER = D.questions.map(q => q.id);
+const KEYS = ['ds', 'os', 'db', 'net'];
+const inSub = k => D.questions.filter(q => q.s === k);
+const txt = h => h.replace(/<[^>]+>/g, '');
+const simStars = s => Math.max(0, ...s.qs.map(id => Q[id] ? Q[id].stars : 0));
+const STARS = D.questions.filter(q => q.stars).sort((a, b) => b.stars - a.stars || a.i - b.i).map(q => q.id);
+
+// 단락 (00 6.2): 핵심 + 도입 + 소제목마다 + 꼬리질문 묶음
+function chunks(q) {
+  if (q._c) return q._c;
+  const out = [{ t: '핵심', core: true }];
+  q.body.split(/(?=<h3>)/).filter(Boolean).forEach(p => {
+    const m = p.match(/^<h3>(.*?)<\/h3>/);
+    out.push({ t: m ? m[1] : '', html: m ? p.slice(m[0].length) : p });
+  });
+  if (q.tails.length) out.push({ t: '꼬리질문', tails: true });
+  return q._c = out;
+}
+const minutes = q => Math.max(1, Math.ceil((txt(q.core + q.body) + q.tails.map(t => t.q + txt(t.a)).join('')).length / 500));
+
+// ===== 상태 (00 6절). 시안은 장면마다 예시 상태를 만들어 쓴다 =====
+const mk = (o = {}) => ({ read: new Set(o.read || []), conf: new Set(o.conf || []), everConf: !!o.everConf, prog: { ...(o.prog || {}) }, last: o.last || null, seen: { ...(o.seen || {}) }, off: o.off || 'saved', pct: o.pct || 100, net: o.net || 'on', store: o.store || 'ok', note: o.note || null });
+const MID_READ = [...inSub('ds').slice(0, 10).map(q => q.id), 'os-process', 'os-multi-thread', 'os-mp-vs-mt', 'os-deadlock', 'db-pk', 'db-nm', 'db-join'];
+const SEEN = { recallTip: 1, confToast: 1, firstRead: 1, offlineDone: 1 };
+const SEED = {
+  first: () => mk({ off: 'saving', pct: 64 }),
+  mid: () => mk({ read: MID_READ, conf: ['ds-array-vs-ll', 'ds-collision', 'os-sync'], everConf: true, prog: { 'db-transaction': 3, 'os-multi-process': 4 }, last: { id: 'db-transaction', chunk: 3 }, seen: SEEN }),
+  done: () => mk({ read: ORDER, conf: ['ds-array-vs-ll', 'ds-collision', 'os-sync'], everConf: true, last: { id: 'net-cookie-login', chunk: 2 }, seen: SEEN }),
+  noconf: () => mk({ read: MID_READ, seen: SEEN }),
+  cleared: () => mk({ read: MID_READ, everConf: true, seen: SEEN }),
+};
+let S = SEED.mid();
+const isRead = id => S.read.has(id), isConf = id => S.conf.has(id);
+const prog = id => isRead(id) ? 1 : Math.min(1, (S.prog[id] || 0) / chunks(Q[id]).length); // 내용이 바뀌어 단락이 줄어도 1 을 넘지 않음
+const subRead = k => inSub(k).filter(q => isRead(q.id)).length;
+
+// ===== 그리는 도구 =====
+const ic = (id, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const MARK = () => `<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#03257B"/><g transform="translate(5 6.5) scale(1.16)"><rect x="5" width="14" height="4" rx="2" fill="#6194F8"/><rect y="6" width="18" height="4" rx="2" fill="#fff"/><rect x="3" y="12" width="16" height="4" rx="2" fill="#fff"/></g></svg>`;
+const starTag = n => n ? `<span class="tag star num" aria-label="빈출 별 ${n}개">${ic('star', 'f')}${n}</span>` : '';
+const confTag = (t = '헷갈림') => `<span class="tag conf">${t}</span>`;
+function glyph(id) {
+  if (isRead(id)) return `<span class="gl done" role="img" aria-label="읽음">${ic('check')}</span>`;
+  const p = prog(id);
+  if (p > 0) return `<span class="gl ing" style="--p:${p}" role="img" aria-label="읽는 중, ${chunks(Q[id]).length}단락 중 ${S.prog[id]}"></span>`;
+  return `<span class="gl" role="img" aria-label="안 읽음"></span>`;
+}
+function blockOf(id, extra = '', k = 0) {
+  const r = isRead(id), p = prog(id), c = isConf(id) ? ' c' : '';
+  const cls = r ? ' r' : p > 0 ? ' i' : '';
+  return `<i class="blk${cls}${c}${extra}" style="--p:${p};--k:${k}"></i>`;
+}
+// 쌓는 순서: 읽음 → 읽는 중 → 안 읽음, 같은 무리 안에서는 헷갈림 먼저
+const rank = id => (isRead(id) ? 0 : prog(id) > 0 ? 2 : 4) + (isConf(id) ? 0 : 1);
+const stackOrder = k => inSub(k).map(q => q.id).sort((a, b) => rank(a) - rank(b) || Q[a].i - Q[b].i);
+const segs = (n, filled, live) => `<span class="seg${live ? ' live' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${Math.round(filled)}" aria-valuetext="${n}단락 중 ${Math.max(1, Math.ceil(filled))}번째">${Array.from({ length: n }, (_, i) => `<i><b style="--f:${Math.max(0, Math.min(1, filled - i))}"></b></i>`).join('')}</span>`;
+
+// 일러스트 자리 (00 5.15): 파일이 있으면 그 그림, 없으면 대체 그림
+const ILL_READY = new Set(window.ILL_READY || []);
+const illImg = id => ILL_READY.has(id) ? `<img class="illimg" src="illustrations/${id}.png" alt="" onload="this.parentElement.classList.add('has')" onerror="this.remove()">` : '';
+const ill = (id, svg, cls = '') => `<span class="ill ${cls}" data-ill="${id}">${illImg(id)}${svg}</span>`;
+const B = '#6194F8', N = '#03257B', W = '#FFFFFF', WM = '#FFE0B0';
+const L = '#EAF1FE';
+const HERO = {
+  ds: () => `${[0, 1, 2, 3, 4].map(i => `<rect x="${97 + i * 28}" y="${i === 3 ? 34 : 42}" width="24" height="24" rx="6" fill="${i === 3 ? WM : i % 2 ? B : W}"/>`).join('')}<rect x="122" y="84" width="96" height="4" rx="2" fill="${B}"/>${[130, 170, 210].map(x => `<circle cx="${x}" cy="86" r="9" fill="${x === 170 ? N : B}"/>`).join('')}`,
+  os: () => `<rect x="110" y="30" width="60" height="60" rx="12" fill="${B}"/><rect x="125" y="45" width="30" height="30" rx="6" fill="${W}"/>${[0, 1, 2].map(i => `<rect x="${122 + i * 15}" y="22" width="6" height="8" rx="2" fill="${B}"/><rect x="${122 + i * 15}" y="90" width="6" height="8" rx="2" fill="${B}"/><rect x="102" y="${42 + i * 15}" width="8" height="6" rx="2" fill="${B}"/><rect x="170" y="${42 + i * 15}" width="8" height="6" rx="2" fill="${B}"/>`).join('')}<rect x="196" y="52" width="56" height="36" rx="8" fill="${W}"/><rect x="188" y="40" width="56" height="36" rx="8" fill="${W}"/><rect x="198" y="50" width="30" height="6" rx="3" fill="${WM}"/><rect x="198" y="61" width="20" height="5" rx="2.5" fill="${N}"/>`,
+  db: () => `<rect x="112" y="30" width="64" height="58" fill="${B}"/><ellipse cx="144" cy="88" rx="32" ry="9" fill="${B}"/><path d="M112 50a32 9 0 0 0 64 0M112 69a32 9 0 0 0 64 0" fill="none" stroke="${W}" stroke-width="2"/><ellipse cx="144" cy="30" rx="32" ry="9" fill="${N}"/><rect x="188" y="40" width="58" height="50" rx="8" fill="${W}"/><rect x="188" y="40" width="58" height="12" rx="6" fill="${B}"/><rect x="196" y="60" width="42" height="7" rx="3.5" fill="${WM}"/><rect x="196" y="74" width="30" height="7" rx="3.5" fill="${L}"/>`,
+  net: () => `<rect x="96" y="54" width="48" height="34" rx="8" fill="${B}"/><rect x="104" y="62" width="32" height="16" rx="3" fill="${W}"/><rect x="214" y="28" width="38" height="64" rx="8" fill="${N}"/><rect x="222" y="40" width="22" height="5" rx="2.5" fill="${B}"/><rect x="222" y="51" width="22" height="5" rx="2.5" fill="${B}"/><path d="M144 68C164 32 192 32 214 52" fill="none" stroke="${B}" stroke-width="2" stroke-linecap="round"/><rect x="167" y="35" width="24" height="17" rx="3" fill="${WM}"/><path d="M168 37l11 7l11 -7" fill="none" stroke="${N}" stroke-width="2"/>`,
+  // 다 읽음: 과목 탑 4개가 꽉 참. 헷갈림은 빨간 테두리 그대로 (01 5절)
+  done: () => KEYS.map((k, ti) => inSub(k).map((q, j) => `<rect x="${71 + ti * 54}" y="${106 - (j + 1) * 8}" width="46" height="6" rx="3" fill="${B}"/>${isConf(q.id) ? `<rect x="${72 + ti * 54}" y="${107 - (j + 1) * 8}" width="44" height="4" rx="2" fill="none" stroke="#F04452" stroke-width="1.5"/>` : ''}`).join('')).join(''),
+};
+const SYM = {
+  ds: () => `<rect x="4" y="18" width="12" height="12" rx="3" fill="${B}"/><rect x="18" y="14" width="12" height="12" rx="3" fill="${N}"/><rect x="32" y="18" width="12" height="12" rx="3" fill="${B}"/>`,
+  os: () => `<rect x="11" y="11" width="26" height="26" rx="6" fill="${B}"/><rect x="18" y="18" width="12" height="12" rx="3" fill="${W}"/>${[0, 1, 2].map(i => `<rect x="${16 + i * 7}" y="6" width="3" height="5" rx="1.5" fill="${B}"/><rect x="${16 + i * 7}" y="37" width="3" height="5" rx="1.5" fill="${B}"/><rect x="6" y="${16 + i * 7}" width="5" height="3" rx="1.5" fill="${B}"/><rect x="37" y="${16 + i * 7}" width="5" height="3" rx="1.5" fill="${B}"/>`).join('')}`,
+  db: () => `<rect x="11" y="12" width="26" height="24" fill="${B}"/><ellipse cx="24" cy="36" rx="13" ry="4.5" fill="${B}"/><path d="M11 20a13 4.5 0 0 0 26 0M11 28a13 4.5 0 0 0 26 0" fill="none" stroke="${W}" stroke-width="2"/><ellipse cx="24" cy="12" rx="13" ry="4.5" fill="${N}"/>`,
+  net: () => `<circle cx="24" cy="24" r="16" fill="${B}"/><path d="M8 24h32M24 8c-8 9-8 23 0 32M24 8c8 9 8 23 0 32" fill="none" stroke="${W}" stroke-width="2"/>`,
+};
+const STATE = {
+  'ill-empty-conf': `${[0, 1, 2, 3].map(i => `<rect x="${46 + (i % 2) * 4}" y="${96 - i * 13}" width="${68 - (i % 2) * 8}" height="9" rx="4.5" fill="${i === 3 ? N : B}"/>`).join('')}<circle cx="80" cy="30" r="14" fill="${WM}"/><path d="M73 30l5 5l9 -9" fill="none" stroke="${N}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`,
+  'ill-notfound': `<path d="M80 52c-12-7-30-8-44-4v54c14-4 32-3 44 4c12-7 30-8 44-4V48c-14-4-32-3-44 4z" fill="${L}"/><rect x="78" y="52" width="4" height="54" rx="2" fill="${B}"/><rect x="62" y="12" width="36" height="28" rx="6" fill="${B}"/><rect x="70" y="20" width="20" height="12" rx="3" fill="${W}"/>`,
+  'ill-offline': `<path d="M50 74a15 15 0 0 1 2-30a21 21 0 0 1 40-4a16 16 0 0 1 6 34z" fill="${B}"/><path d="M76 50v22M68 64l8 8l8 -8" fill="none" stroke="${W}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="104" y="40" width="22" height="34" rx="5" fill="${L}"/>`,
+};
+const hero = k => ill('hero-' + k, `<svg viewBox="0 0 350 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${HERO[k]()}</svg>`);
+const sym = (k, cls = '') => ill('sym-' + k, `<svg viewBox="0 0 48 48" aria-hidden="true">${SYM[k]()}</svg>`, cls);
+const stateIll = id => ill(id, `<svg viewBox="0 0 160 120" aria-hidden="true">${STATE[id]}</svg>`);
+
+// 포스터 (04 4절): 시뮬레이션마다 자기 첫 묶음 자리(make-data.py)를 줄여 넣는다(meet, 잘림 없음). 높이에서 끊은 4개만 아래 흐림
+const FIG = id => `fig/${id}.svg`;
+const pAr = simId => { const [, , w, h] = D.poster[simId].vb.split(' ').map(Number); return w / h; };
+// 안쪽 svg 가 자리 밖을 잘라 낸다(meet 의 남는 칸에 위아래 도식이 반쯤 비치지 않게)
+const poster = simId => { const f = SIM[simId].fig, p = D.poster[simId], [x, y, w, h] = p.vb.split(' '); return `<svg class="pst${p.fade ? ' fade' : ''}" viewBox="${p.vb}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="${p.vb}"><image href="${FIG(f)}" width="390" height="${D.figH[f]}"/></svg></svg>`; };
+const nw = s => s.replace(/(\S+\/\S+)/g, '<span class="nw">$1</span>');
+const tt = s => s.replace(/(\S{1,8}\)[가-힣]+)/g, '<span class="nw">$1</span>'); // 제목: 괄호 뒤 조사가 다음 줄로 떨어지지 않게
+// 본문 도식 (03 5.4): 위 머리표 줄 42px 를 잘라 보인다
+const figure = (f, title) => `<svg viewBox="0 42 390 ${D.figH[f] - 42}" role="img" aria-label="${title || ''}"><image href="${FIG(f)}" width="390" height="${D.figH[f]}"/></svg>`;
+
+// ===== 머리 =====
+function hmain(on) {
+  const t = (k, n) => `<a href="#" data-go="${k}"${on === k ? ' aria-current="page"' : ''} class="t-title2"><span>${n}</span></a>`;
+  return `<header class="hm"><a href="#" class="r1" data-go="home" aria-label="CS 차곡 홈">${MARK()}<span class="t-row">CS 차곡</span></a><nav class="r2" aria-label="주요 화면">${t('home', '홈')}${t('toc', '목차')}${t('sims', '시뮬레이션')}<i class="ul" aria-hidden="true"></i></nav></header><div class="sent" data-sent></div>`;
+}
+function hsub(k, on, progress = '', cls = '') {
+  const t = (r, n) => `<a href="#" data-go="${r}"${on === r ? ' aria-current="page"' : ''} class="t-ui">${n}</a>`;
+  return `<header class="hs${cls}"><div class="row1"><button class="ib" data-act="back" aria-label="뒤로">${ic('back')}</button><span class="sub t-ui">${k ? SUB[k].name : ''}</span><nav class="stabs" aria-label="주요 화면">${t('home', '홈')}${t('toc', '목차')}${t('sims', '시뮬레이션')}</nav></div>${progress ? `<div class="prog">${progress}</div>` : ''}</header>`;
+}
+// 화면 위 안내 줄 (06 3.4, 5)
+function notes() {
+  let h = '';
+  if (S.net === 'off') h += `<div class="note t-ui" role="status">${ic('wifioff')}<p>${S.off === 'saved' ? '오프라인이에요. 저장된 내용으로 보고 있어요.' : '오프라인이에요. 저장이 끝난 내용만 볼 수 있어요.'}</p></div>`;
+  if (S.store === 'off') h += `<div class="note t-ui" role="status">${ic('info')}<p>이 브라우저에서는 진도가 저장되지 않아요. 앱을 닫으면 처음 상태로 돌아가요.</p><button class="ib" data-act="closeNote" aria-label="안내 닫기">${ic('x')}</button></div>`;
+  if (S.store === 'broken') h += `<div class="note t-ui" role="status">${ic('info')}<p>저장된 진도를 읽지 못해 새로 시작했어요.</p><button class="ib" data-act="closeNote" aria-label="안내 닫기">${ic('x')}</button></div>`;
+  return h;
+}
+const band = '<div class="band" aria-hidden="true"></div>';
+
+// ===== 홈 (01) =====
+function nextUnread(after) {
+  const start = after ? ORDER.indexOf(after) + 1 : 0;
+  for (let k = 0; k < ORDER.length; k++) { const id = ORDER[(start + k) % ORDER.length]; if (!isRead(id)) return id; }
+  return null;
+}
+function heroState() {
+  if (S.read.size === ORDER.length) return { kind: 'done' };
+  if (S.last && !isRead(S.last.id)) return { kind: 'resume', id: S.last.id };
+  const id = nextUnread(S.last && S.last.id);
+  return { kind: S.read.size || S.last ? 'next' : 'first', id };
+}
+function heroCard() {
+  const h = heroState();
+  if (h.kind === 'done') {
+    const nc = S.conf.size;
+    return `<a href="#" class="card hero done" data-go="${nc ? 'toc/conf' : 'toc/star'}" aria-label="40문항을 모두 쌓았어요, ${nc ? '헷갈림만 다시 읽기' : '빈출부터 다시 읽기'}"><div class="strip">${hero('done')}</div><div class="bd"><p class="t-label c-a">한 바퀴 끝</p><h2 class="t-title2">40문항을 모두 쌓았어요</h2><p class="t-label c-3" style="margin-top:12px">${nc ? `헷갈림 ${nc}문항이 남아 있어요` : '헷갈린 질문 없이 끝냈어요'}</p><span class="btn l pri fake">${nc ? '헷갈림만 다시 읽기' : '빈출부터 다시 읽기'}</span></div></a>`;
+  }
+  const q = Q[h.id], n = chunks(q).length;
+  const resume = h.kind === 'resume', ch = resume ? S.last.chunk : 0;
+  const btn = { resume: '이어 읽기', next: '다음 질문 읽기', first: '첫 질문 읽기' }[h.kind];
+  const pos = resume ? `${n}단락 중 ${ch}번째` : `처음부터 ${n}단락`;
+  const route = resume ? `q/${q.id}?ctx=resume&from=home` : `q/${q.id}?ctx=next&from=home`;
+  return `<a href="#" class="card hero" data-go="${route}" aria-label="${btn}, ${q.title}, ${n}단락 중 ${Math.max(1, ch)}번째"><div class="strip">${hero(q.s)}</div><div class="bd"><p class="t-label c-a">${SUB[q.s].name} · ${q.sub}</p><h2 class="t-title2">${tt(q.title)}</h2><div class="posr">${segs(n, resume ? S.prog[q.id] || ch : 0)}<span class="t-label c-3 num">${pos}</span></div><span class="btn l pri fake">${btn}</span></div></a>`;
+}
+let RND = 'net-get-post';
+function pickRandom() {
+  const pool = ORDER.filter(id => id !== RND && !(S.last && id === S.last.id));
+  const w = pool.flatMap(id => isRead(id) ? [id] : [id, id]);
+  return RND = w[Math.floor(Math.random() * w.length)];
+}
+const rndInner = id => { const q = Q[id]; return `<div class="top"><p class="t-label c-a">${SUB[q.s].name} · ${q.sub}</p>${starTag(q.stars)}</div><h3 class="t-row">${tt(q.title)}</h3><p class="hid t-label c-3">${ic('eyeoff')}답은 가려져 있어요</p>`; };
+function homeView(o = {}) {
+  const sum = S.read.size;
+  const towers = KEYS.map(k => {
+    const ids = stackOrder(k), nc = inSub(k).filter(q => isConf(q.id)).length, r = subRead(k), n = ids.length;
+    return `<a href="#" class="tw" data-go="toc/${k}" aria-label="${SUB[k].name}, ${n}문항 중 ${r}문항 읽음${nc ? `, 헷갈림 ${nc}` : ''}"><span class="stack">${ids.map((id, j) => blockOf(id, o.pop === id ? ' pop' : '', j)).join('')}</span>${sym(k)}<span class="t-caption">${SUB[k].name}</span><span class="t-label c-3 num">읽음 ${r} / ${n}</span>${nc ? `<span class="t-label cf num">헷갈림 ${nc}</span>` : ''}</a>`;
+  }).join('');
+  const unreadStar = STARS.filter(id => !isRead(id)), starIds = [...unreadStar, ...STARS.filter(id => isRead(id))].slice(0, 3);
+  const h = heroState(), lastSims = S.last && h.kind === 'resume' ? Q[S.last.id].sims : [];
+  const simId = lastSims.length ? (lastSims[0] === 'hash-storage' || lastSims[0] === 'hash-collision' ? 'hash-table' : lastSims[0]) : 'hash-table';
+  const sm = SIM[simId];
+  const offSt = { saved: `<span class="st t-label c-a">${ic('check')}저장됨</span>`, saving: `<span class="st t-label c-3 num">저장하는 중 ${S.pct}%</span>`, fail: `<button class="st t-label lnk" data-act="noop">다시 시도</button>` }[S.off];
+  const hasProg = S.read.size || S.conf.size || Object.keys(S.prog).length;
+  return hmain('home') + notes() + `
+  <section class="sec" style="padding-top:16px">${heroCard()}</section>${band}
+  <section class="sec rnd"><div class="sh"><h2 class="t-head">랜덤 질문</h2><button class="ib" data-act="shuffle" aria-label="다른 질문">${ic('shuffle')}</button></div><a href="#" class="card" data-go="q/${RND}?ctx=random&from=home" aria-label="랜덤 질문, ${Q[RND].title}, 답은 가려져 있어요"><div class="bd swap">${rndInner(RND)}</div></a><span class="sr" role="status" data-live></span></section>${band}
+  <section class="sec"><div class="sh"><h2 class="t-head">과목 진도</h2><p class="sum"><span class="t-label c-3">읽음&nbsp;</span><b class="t-display c-a num">${sum}</b><span class="t-label c-3 num">&nbsp;/ ${ORDER.length}</span></p></div><div class="towers" data-towers>${towers}</div>${sum ? '' : '<p class="hint t-ui c-2">질문을 다 읽을 때마다 여기에 한 칸씩 쌓여요</p>'}${S.conf.size ? `<div class="rows revrow"><a href="#" class="row" data-go="toc/conf">${ic('help', 'ri')}<div class="tx"><b>헷갈림 ${S.conf.size}문항 다시 보기</b></div>${ic('right', 'ri')}</a></div>` : ''}</section>${band}
+  <section class="sec" style="padding-bottom:16px"><div class="sh"><h2 class="t-head">자주 나온 질문</h2><a href="#" class="lnk t-label" data-go="toc/star">전체 ${STARS.length}${ic('right')}</a></div><div class="rows">${starIds.map(id => row(id, 'star', true, { from: 'home' })).join('')}</div></section>${band}
+  <section class="sec"><div class="sh"><h2 class="t-head">시뮬레이션</h2></div><a href="#" class="card simcard" data-go="sim/${simId}" aria-label="${sm.title}, ${SUB[sm.s].name}, 빈출 별 ${simStars(sm)}개"><div class="pf" style="--ar:${Math.max(pAr(simId), 1.6).toFixed(3)}">${poster(simId)}</div><div class="bd"><div class="nm"><b class="t-row">${nw(sm.title)}</b>${starTag(simStars(sm))}</div><p class="t-label c-3" style="margin-top:4px">${SUB[sm.s].name} · ${lastSims.length ? '읽던 질문과 이어져요' : `관련 질문 ${sm.qs.length}`}</p></div></a></section>${band}
+  <section class="sec dev" style="padding-bottom:8px"><div class="sh" style="margin-bottom:4px"><h2 class="t-head">이 기기에 저장</h2></div><div class="rows">
+    <div class="row" style="pointer-events:none">${ic('cloud', 'ri')}<div class="tx"><b>오프라인 저장</b><p class="meta t-label">인터넷 없이도 본문과 시뮬레이션을 봐요</p></div>${offSt}</div>
+    <a href="#" class="row${hasProg ? '' : ' off'}" data-act="reset"${hasProg ? '' : ' aria-disabled="true"'}>${ic('restore', 'ri')}<div class="tx"><b>진도 초기화</b><p class="meta t-label num">${hasProg ? (S.read.size === ORDER.length ? '처음부터 다시 하려면 진도를 초기화해 주세요' : `읽음 ${S.read.size} · 헷갈림 ${S.conf.size}`) : '지울 진도가 없어요'}</p></div></a>
+  </div></section><div class="tail-space"></div>`;
+}
+function row(id, ctx, showSub, o = {}) {
+  const q = Q[id], reading = S.last && S.last.id === id && !isRead(id) && ctx === 'book';
+  const words = [showSub ? SUB[q.s].name : '', q.tails.length ? `꼬리질문 ${q.tails.length}` : ''].filter(Boolean).join(' · ');
+  const meta = [reading ? '<span class="t-caption c-a">읽던 곳</span>' : '', o.noStar ? '' : starTag(q.stars), ctx !== 'conf' && isConf(id) ? confTag() : '', words ? `<span>${words}</span>` : ''].filter(Boolean);
+  const go = (reading ? `q/${id}?ctx=resume` : `q/${id}?ctx=${ctx}`) + (o.from ? `&from=${o.from}` : '');
+  return `<a href="#" class="row${reading ? ' reading' : ''}" data-go="${go}" data-q="${id}">${glyph(id)}<div class="tx"><b>${tt(q.title)}</b>${meta.length ? `<p class="meta t-label">${meta.join('')}</p>` : ''}</div></a>`;
+}
+
+// ===== 목차 (02) =====
+function segc(items, sel, act) {
+  const si = Math.max(0, items.findIndex(([k]) => k === sel));
+  return `<div class="segc" role="tablist" style="--n:${items.length}">${items.map(([k, label]) => `<button role="tab" class="t-ui num" aria-selected="${k === sel}" data-act="${act}" data-v="${k}">${label}</button>`).join('')}<i class="th" style="--i:${si}" aria-hidden="true"></i></div>`;
+}
+function tocView(view = 'all', o = {}) {
+  const nc = S.conf.size;
+  let h = hmain('toc') + notes() + `<div class="segbar">${segc([['all', `전체 ${ORDER.length}`], ['star', `빈출 ${STARS.length}`], ['conf', `헷갈림만${nc ? ' ' + nc : ''}`]], view, 'tocview')}</div>`;
+  if (view === 'all') {
+    h += `<nav class="jump" aria-label="장 이동">${KEYS.map(k => `<a href="#" class="t-ui" data-act="jump" data-k="${k}"${k === (o.cur || 'ds') ? ' aria-current="location"' : ''}>${SUB[k].name}</a>`).join('')}</nav><div role="tabpanel" class="${o.anim ? 'list-in' : ''}">`;
+    KEYS.forEach((k, ki) => {
+      const nck = inSub(k).filter(q => isConf(q.id)).length;
+      h += `${ki ? band : ''}<section data-ch="${k}"><div class="ch" id="ch-${k}"><div class="l1">${sym(k)}<div class="nm"><h2 class="t-title2">${SUB[k].name}</h2>${nck ? confTag('헷갈림 ' + nck) : ''}</div><span class="t-label c-3 num">읽음 ${subRead(k)} / ${inSub(k).length}</span></div><div class="brow" aria-hidden="true">${stackOrder(k).map(id => blockOf(id)).join('')}</div></div>`;
+      SUB[k].subs.forEach(sb => {
+        const qs = inSub(k).filter(q => q.sub === sb);
+        h += `<p class="topic t-label">${sb} · ${qs.length}</p>${qs.map(q => row(q.id, 'book')).join('')}`;
+      });
+      h += '</section>';
+    });
+    h += '</div>';
+  } else if (view === 'star') {
+    // 별 무리로 나눈 보기라 행마다 별 꼬리표를 다시 달지 않는다 (UX 1)
+    h += `<div role="tabpanel" class="${o.anim ? 'list-in' : ''}">`;
+    [4, 2, 1].forEach(n => {
+      const ids = STARS.filter(id => Q[id].stars === n);
+      h += `<div class="grp">${starTag(n)}<span class="t-label c-3">${ids.length}문항</span></div>${ids.map(id => row(id, 'star', true, { noStar: 1 })).join('')}`;
+    });
+    h += `<div class="endnote"><p class="t-ui">별이 없는 ${ORDER.length - STARS.length}문항은 전체에서 볼 수 있어요</p><a href="#" class="lnk t-ui" data-act="tocview" data-v="all">전체 보기</a></div></div>`;
+  } else {
+    const ids = ORDER.filter(isConf);
+    if (!ids.length) {
+      const cleared = S.everConf;
+      h += `<div role="tabpanel" class="empty">${stateIll('ill-empty-conf')}<h2 class="t-title2">${cleared ? '헷갈림을 모두 풀었어요' : '헷갈리는 질문이 없어요'}</h2><p class="t-ui c-2">${cleared ? '다시 볼 질문이 생기면 여기에 모여요' : '읽다가 헷갈리면 질문 아래 헷갈려요를 눌러 두세요'}</p><button class="btn sec" data-act="tocview" data-v="star">빈출 ${STARS.length} 보기</button></div>`;
+    } else {
+      h += `<div role="tabpanel"><div class="confsum"><p class="sum"><b class="t-display num">${ids.length}</b><span class="t-label c-3">문항</span></p><p class="t-ui c-2">이해했다면 질문 아래에서 헷갈림을 꺼 주세요</p><button class="btn l pri" data-go="q/${ids[0]}?ctx=conf">첫 문항부터 다시 읽기</button></div><div class="${o.anim ? 'list-in' : ''}">${ids.map(id => row(id, 'conf', true)).join('')}</div></div>`;
+    }
+  }
+  return h + '<div class="tail-space"></div>';
+}
+
+// ===== 질문 (03) =====
+// 머리의 켜진 탭 = 뒤로 목적지 (00 7.2). 홈에서 연 질문은 홈, 시뮬레이션에서 연 질문은 시뮬레이션, 나머지는 목차
+const TAB = { random: 'home', next: 'home', sim: 'sims' };
+function ctxOf(kind, id, from) {
+  let c;
+  if (kind === 'star') c = { kind, list: STARS.slice() };
+  else if (kind === 'conf') { const l = ORDER.filter(isConf); c = { kind, list: l.includes(id) ? l : [...l, id].sort((a, b) => Q[a].i - Q[b].i) }; }
+  else if (kind === 'random') c = { kind, list: [] };
+  else c = { kind, list: ORDER };
+  c.from = from || TAB[kind] || 'toc';
+  return c;
+}
+// 위치는 분수 대신 `N개 중 k번째` (분수는 읽은 수에만, 00 12절)
+function posText(q, ctx) {
+  if (ctx.kind === 'random') return '';
+  if (ctx.kind === 'star') return `빈출 ${ctx.list.length}개 중 ${ctx.list.indexOf(q.id) + 1}번째`;
+  if (ctx.kind === 'conf') return `헷갈림 ${ctx.list.length}개 중 ${ctx.list.indexOf(q.id) + 1}번째`;
+  return `${inSub(q.s).length}개 중 ${inSub(q.s).indexOf(q) + 1}번째`;
+}
+function firstSentence(html) {
+  const t = document.createElement('template'); t.innerHTML = html;
+  const p = t.content.querySelector('p'); if (!p) return html;
+  const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+  for (let n; (n = w.nextNode());) {
+    const m = /\.(?=\s|$)/.exec(n.data); if (!m) continue;
+    const r = document.createRange(), mk = document.createElement('mark');
+    r.setStart(p, 0); r.setEnd(n, m.index + 1); mk.appendChild(r.extractContents()); p.prepend(mk);
+    return t.innerHTML;
+  }
+  return html;
+}
+function renderFigs(html) {
+  return html.replace(/<figure class="fig" data-fig="([\w-]+)" data-sim="([\w-]*)"><\/figure>/g, (_, f, sm) => {
+    const sid = sm === 'hash-storage' || sm === 'hash-collision' ? 'hash-table' : sm;
+    const go = sid && SIM[sid] ? `<a href="#" class="simgo" data-go="sim/${sid}"><span class="pv">${poster(sid)}</span><span class="tx"><b>시뮬레이션으로 보기</b><span class="t-label c-2">${nw(SIM[sid].title)}</span></span>${ic('right')}</a>` : '';
+    return `<figure class="fig">${figure(f)}</figure>${go}`;
+  });
+}
+function qView(id, ctx, o = {}) {
+  const q = Q[id];
+  if (!q) return notFound('q');
+  const cs = chunks(q), n = cs.length, pos = posText(q, ctx), long = q.title.length > 40;
+  const live = o.revealed, more = `&from=${ctx.from}`;
+  let h = hsub(q.s, ctx.from, segs(n, live ? (o.fill || 0) : 0, live)) + `
+  <div class="qh"><div class="top"><p class="l"><span class="t-label c-a">${q.sub}</span></p>${pos ? `<span class="t-label c-3 num" style="white-space:nowrap">${pos}</span>` : ''}</div>
+  <h1 class="${long ? 't-title2' : 't-title1'}" tabindex="-1">${tt(q.title)}</h1><p class="info t-label c-3">${starTag(q.stars)}<span>약 ${minutes(q)}분${q.tails.length ? ` · 꼬리질문 ${q.tails.length}` : ''}</span></p></div>`;
+  if (!o.revealed) {
+    // 답 자리: 판이 막대 위까지 늘어나 문제 카드 앞면처럼 선다. 과목 기호만, 답 글은 없음 (00 7.5)
+    h += `<div class="recall"><div class="mid">${sym(q.s)}<h2 class="t-head">먼저 떠올려 보세요</h2><p class="t-ui c-2">${S.seen.recallTip ? '핵심을 한두 문장으로 정리해 본 뒤 답을 열어 보세요.' : '답은 가려 뒀어요. 핵심을 한두 문장으로 떠올린 뒤 열어 보세요.'}</p></div><button class="btn l pri" data-act="reveal" aria-expanded="false">${ic('eye')}답 보기</button></div>`;
+  } else {
+    h += `<div class="ans${o.anim ? ' in' : ''}"><div class="prose">`;
+    cs.forEach((c, i) => {
+      const here = o.mark && i === o.mark - 1 ? ' <span class="tag here here-in" data-here>멈춘 곳</span>' : '';
+      if (c.core) h += `<div class="chunk" data-c="${i}" style="view-timeline-name:--c${i}"><div class="coreh"><span class="t-label c-a">핵심</span><button class="lnk t-ui" data-act="hide">다시 가리기</button></div><div class="t-core c-ink">${firstSentence(q.core)}</div></div>`;
+      else if (c.tails) h += `</div></div>${band}<section class="tails chunk" data-c="${i}" style="view-timeline-name:--c${i}"><h2 class="t-head">꼬리질문 ${q.tails.length}${here}</h2>${q.tails.map((t, j) => `<button class="tq t-row" data-act="tail" data-j="${j}" aria-expanded="${!!(o.tails && o.tails.includes(j))}"><span>${t.q}</span>${ic('down')}</button>${o.tails && o.tails.includes(j) ? `<div class="ta prose">${renderFigs(t.a)}</div>` : ''}`).join('')}</section><div><div>`;
+      else h += `<div class="chunk${c.t ? '' : ' intro'}" data-c="${i}" style="view-timeline-name:--c${i}">${c.t ? `<h3>${c.t}${here}</h3>` : (here ? `<p class="t-label">${here}</p>` : '')}${renderFigs(c.html)}</div>`;
+    });
+    h += `</div></div>${band}${endZone(q, { ...o, revealed: 1, book: ctx.list === ORDER })}`;
+  }
+  const list = ctx.list, k = list.indexOf(id), prev = k > 0 ? list[k - 1] : null, next = k >= 0 && k < list.length - 1 ? list[k + 1] : null;
+  const kk = ctx.kind === 'resume' || ctx.kind === 'next' || ctx.kind === 'sim' ? 'book' : ctx.kind;
+  const nextLabel = ctx.kind === 'random' ? '다른 질문' : next ? '다음 질문' : (ctx.kind === 'star' || ctx.kind === 'conf' ? '목록으로' : '목차로');
+  const nextGo = ctx.kind === 'random' ? 'act:another' : next ? `q/${next}?ctx=${kk}${more}` : (ctx.kind === 'star' ? 'toc/star' : ctx.kind === 'conf' ? 'toc/conf' : 'toc');
+  const bar = `<div class="bar" data-bar>${ctx.kind === 'random' ? '' : `<button class="btn sec ico" data-go="${prev ? `q/${prev}?ctx=${kk}${more}` : ''}" data-replace aria-label="이전 질문"${prev ? '' : ' disabled'}>${ic('prev')}</button>`}<button class="btn sec grow cfb${o.popConf ? ' popi' : ''}" data-act="conf" aria-pressed="${isConf(id)}" aria-label="헷갈림 표시">${ic(isConf(id) ? 'check' : 'help')}<span class="lbl">헷갈려요</span></button><button class="btn ${o.revealed ? 'pri' : 'sec'} grow2" ${nextGo.startsWith('act:') ? `data-act="${nextGo.slice(4)}"` : `data-go="${nextGo}" data-replace`}>${nextLabel}${ic('next')}</button></div>`;
+  return { html: h + '<div class="tail-space"></div>', bar, cls: o.revealed ? '' : 'qflex' };
+}
+// 끝 영역 (03 5.6): 끝에 와야 보이는 자리라 `끝까지 읽으면` 안내는 두지 않는다. 읽기 전에는 블록 줄과 읽은 수만
+function endZone(q, o) {
+  const r = isRead(q.id), k = q.s, ids = stackOrder(k);
+  const msg = o.justRead ? `${SUB[k].name}에 한 칸 쌓였어요` : r ? '읽은 질문이에요' : '';
+  const wait = !r && o.revealed ? '<div class="l2"><p class="t-ui c-2">아직 쌓이지 않았어요</p><button class="lnk t-ui on" data-act="markRead">읽음으로 표시</button></div>' : '';
+  const nx = ORDER[ORDER.indexOf(q.id) + 1], cross = o.book && nx && Q[nx].s !== k;
+  return `<section class="endz" data-end><div class="l1"><div class="brow" style="flex:1">${ids.map(id => blockOf(id, o.justRead === id ? ' pop' : '')).join('')}</div><span class="t-label c-3 num">읽음 ${subRead(k)} / ${ids.length}</span></div>${msg ? `<div class="l2"><p class="t-head">${msg}</p><button class="lnk t-ui" data-act="unread">읽음 취소</button></div>` : wait}${o.justRead && o.first ? '<p class="t-label c-3">홈의 과목 진도에도 쌓여요</p>' : ''}${cross ? `<p class="t-label c-3">${SUB[k].name}의 마지막 질문이에요. 다음은 ${SUB[Q[nx].s].name}예요</p>` : ''}</section>`;
+}
+
+// ===== 시뮬레이션 목록 (04), 시뮬레이션 (05) =====
+function simsView() {
+  let h = hmain('sims') + notes() + `<nav class="jump" aria-label="장 이동">${KEYS.map((k, i) => `<a href="#" class="t-ui" data-act="jump" data-k="${k}"${i ? '' : ' aria-current="location"'}>${SUB[k].name}</a>`).join('')}</nav>`;
+  KEYS.forEach((k, i) => {
+    const ss = D.sims.filter(s => s.s === k);
+    h += `${i ? band : ''}<section data-ch="${k}"><div class="ch" id="ch-${k}"><div class="l1">${sym(k)}<div class="nm"><h2 class="t-title2">${SUB[k].name}</h2></div><span class="t-label c-3 num">${ss.length}개</span></div></div><div class="simgrid">${ss.map(s => `<a href="#" class="simc" data-go="sim/${s.id}" aria-label="${s.title}, ${SUB[k].name}${simStars(s) ? `, 빈출 별 ${simStars(s)}개` : ''}"><div class="pf">${poster(s.id)}</div><p class="t-row">${nw(s.title)}</p>${starTag(simStars(s))}</a>`).join('')}</div></section>`;
+  });
+  return h + '<div class="tail-space"></div>';
+}
+const SIM_CSS = `.sim-top,.sim-q,.sim-say,.sim-ctrl,.sim-tabs{display:none!important}html,body{background:transparent!important}.sim-page{min-height:0!important;padding:0!important;margin:0!important;max-width:none!important;background:transparent!important}.sim-card{margin:0!important;padding:16px!important;border-radius:24px!important;background:#EAF1FE!important}.sim-try{margin:16px 0 0!important;padding:20px!important;border-radius:16px!important;background:#F2F4F6!important}.sim-try h2{font-size:19px;line-height:28px;font-weight:650;color:#191F28}.sim-try p{font-size:15px;line-height:22px;color:#4E5968}.sim-row input{height:52px;border-color:#E5E8EB}.sim-btn{height:52px;border-radius:14px;background:#FFFFFF!important;color:#191F28!important;box-shadow:inset 0 0 0 1px rgba(0,27,55,.1)}.sim-btn.ghost{background:transparent!important;box-shadow:none}.sim-try [role=alert]{margin-top:8px!important;font-size:13px!important;line-height:18px!important;font-weight:600!important;color:#D22030!important}.sim-try input[aria-invalid=true]{border-color:#F04452!important;box-shadow:inset 0 0 0 1px #F04452}@media (prefers-reduced-motion:no-preference){.wire .msg.cur .ar{animation:v2ar .24s cubic-bezier(.22,1,.36,1) both}.wire .msg.r.cur .ar{transform-origin:0 50%}.wire .msg.l.cur .ar{transform-origin:100% 50%}.wire .msg.r.cur .lbl{animation:v2r .24s cubic-bezier(.22,1,.36,1) both}.wire .msg.l.cur .lbl{animation:v2l .24s cubic-bezier(.22,1,.36,1) both}@keyframes v2ar{from{transform:scaleX(0)}}@keyframes v2r{from{transform:translateX(-48px);opacity:0}}@keyframes v2l{from{transform:translateX(48px);opacity:0}}}`;
+// 직접 해 보기 입력 오류 (05 4절): 오류 글을 입력 칸 바로 아래로 옮기고, 틀린 칸에 aria-invalid + aria-describedby. 고치면 뗀다
+// (빌드 때는 kit 이 직접 한다. 시안은 kit 을 고치지 않고 앱이 iframe 안에서 맞춘다)
+function wireTryErrors(form, W) {
+  const err = form.querySelector('[role=alert]'), ins = [...form.querySelectorAll('input')];
+  if (!err || !ins.length) return;
+  err.id = err.id || 'err';
+  const last = ins[ins.length - 1]; (last.closest('.sim-row') || last.closest('label') || last).after(err);
+  const on = () => !err.hidden && err.textContent.trim() && W.getComputedStyle(err).display !== 'none';
+  const mark = () => {
+    const bad = on() ? ins.filter(i => !i.checkValidity()) : [], list = on() && !bad.length ? ins : bad; // kit 이 다른 규칙으로 막았으면 모든 칸
+    ins.forEach(i => { if (list.includes(i)) { i.setAttribute('aria-invalid', 'true'); i.setAttribute('aria-describedby', err.id); } else { i.removeAttribute('aria-invalid'); i.removeAttribute('aria-describedby'); } });
+  };
+  new W.MutationObserver(mark).observe(err, { attributes: true, childList: true, characterData: true, subtree: true });
+  ins.forEach(i => i.addEventListener('input', () => { if (i.checkValidity()) { i.removeAttribute('aria-invalid'); i.removeAttribute('aria-describedby'); } }));
+  mark();
+}
+function simView(id, o = {}) {
+  const s = SIM[id];
+  if (!s) return notFound('sim');
+  const sub = Q[s.qs[0]] ? Q[s.qs[0]].sub : SUB[s.s].name;
+  let stage;
+  if (o.fail) stage = `<div class="stage" style="height:${Math.round(350 * 0.75)}px"><div class="msg"><p class="t-row">시뮬레이션을 열지 못했어요</p><p class="t-ui c-2">${S.net === 'off' ? '오프라인 저장이 끝나기 전이라 아직 열 수 없어요' : '인터넷 연결을 확인하고 다시 시도해 주세요'}</p><div class="acts"><button class="btn sec" data-act="noop">다시 시도</button><a href="#" class="lnk t-ui" data-go="sim/${id}?fig=1" data-replace>그림으로 보기</a></div></div></div>`;
+  else if (o.fig) stage = `<div class="stage figv">${figure(s.fig, s.title)}</div>`;
+  else stage = `<div class="stage" data-stage><iframe title="${s.title} 시뮬레이션" src="../../sims/${id}/index.html?embed=1" data-sim="${id}" data-step="${o.step || 0}" data-last="${o.last ? 1 : ''}"${o.tryv ? ` data-tryv="${o.tryv.join(',')}"` : ''} loading="eager"></iframe></div>`;
+  // 위 줄은 주제만 (개수는 아래 관련 질문 섹션에, 시각 문구)
+  const h = hsub(s.s, 'sims', '', ' flow') + `<div class="simh"><p class="t-label c-a">${sub}</p><h1 class="t-title2" tabindex="-1">${nw(s.title)}</h1><div data-modes></div></div>${o.fail || o.fig ? '' : '<div class="capflow" data-capflow><span class="tag here" data-ctag hidden>직접 넣은 값</span><p class="t-ui" aria-live="polite" data-capf></p><button class="lnk t-ui" data-act="sim" data-k="try" hidden>직접 해 보기</button></div>'}${stage}${band}<section class="related"><h2 class="t-head">관련 질문 ${s.qs.length}</h2>${s.qs.filter(x => Q[x]).map(x => row(x, 'sim', true)).join('')}</section><div class="tail-space"></div>`;
+  const qGo = `q/${s.qs[0]}?ctx=sim&sim=${id}`;
+  const bar = o.fail ? '' : o.fig ? `<div class="bar" data-bar><a href="#" class="btn pri grow" data-go="${qGo}">글로 읽기${ic('next')}</a></div>` :
+    `<div class="bar simbar" data-bar data-simbar="${id}"><div class="st1"><span class="seg" data-segs></span><span class="t-label c-3 num" data-count></span></div><p class="cap t-read" data-cap aria-live="polite">&nbsp;</p><div class="bts"><button class="btn sec ico" data-act="sim" data-k="prev" aria-label="이전 단계">${ic('prev')}</button><button class="btn sec ico" data-act="sim" data-k="play" aria-label="재생">${ic('play')}</button><button class="btn pri grow" data-act="sim" data-k="next" data-q="${qGo}">다음${ic('next')}</button></div></div>`;
+  return { html: h, bar };
+}
+
+// ===== 상태 화면 (06) =====
+function notFound(kind) {
+  const sim = kind === 'sim';
+  return { html: hsub(null, sim ? 'sims' : 'toc') + `<div class="empty">${stateIll('ill-notfound')}<h1 class="t-title2" tabindex="-1">${sim ? '찾는 시뮬레이션이 없어요' : '찾는 질문이 없어요'}</h1><p class="t-ui c-2">주소가 바뀌었을 수 있어요</p><a href="#" class="btn l pri" data-go="${sim ? 'sims' : 'toc'}" style="margin-top:32px">${sim ? '시뮬레이션 목록으로' : '목차로'}</a></div>` };
+}
+// 불러오는 중 자리 모양 (06 3.1): 회색 면만, 탑·블록 모양은 쓰지 않는다. 움직이지 않음
+const loadingView = () => hmain('home') + `<section class="sec" style="padding-top:16px" aria-busy="true"><div class="card"><div style="height:120px;background:var(--stage)"></div><div class="bd"><div class="ph" style="height:14px;width:42%"></div><div class="ph" style="height:22px;width:88%;margin-top:12px"></div><div class="ph" style="height:22px;width:56%;margin-top:8px"></div><div class="ph" style="height:56px;border-radius:14px;margin-top:24px"></div></div></div></section>${band}<section class="sec"><div class="ph" style="height:20px;width:30%"></div><div class="ph" style="height:120px;border-radius:16px;margin-top:16px"></div></section><span class="sr" role="status">불러오는 중</span>`;
+const qLoadingView = () => ({ html: hsub(null, 'toc', segs(5, 0)) + `<div class="qh" aria-busy="true"><div class="ph" style="height:14px;width:36%"></div><div class="ph" style="height:24px;width:84%;margin-top:16px"></div><div class="ph" style="height:14px;width:28%;margin-top:16px"></div></div><span class="sr" role="status">불러오는 중</span><div class="tail-space"></div>` });
+const simsLoadingView = () => hmain('sims') + `<nav class="jump" aria-label="장 이동">${KEYS.map((k, i) => `<a href="#" class="t-ui"${i ? '' : ' aria-current="location"'}>${SUB[k].name}</a>`).join('')}</nav><div class="ch"><div class="l1">${sym('ds')}<div class="nm"><h2 class="t-title2">${SUB.ds.name}</h2></div></div></div><div class="simgrid" aria-busy="true">${Array.from({ length: 6 }, () => `<div class="simc"><div class="pf"></div><div class="ph" style="height:16px;width:80%;margin-top:12px"></div><div class="ph" style="height:16px;width:48%;margin-top:8px"></div></div>`).join('')}</div><span class="sr" role="status">불러오는 중</span>`;
+const loadFailView = () => hmain('home') + `<div class="empty">${stateIll(S.net === 'off' ? 'ill-offline' : 'ill-notfound')}<h1 class="t-title2" tabindex="-1">내용을 불러오지 못했어요</h1><p class="t-ui c-2">${S.net === 'off' ? '인터넷에 연결되면 처음 한 번 내용을 받아 와요' : '인터넷 연결을 확인하고 다시 시도해 주세요'}</p><button class="btn l pri" data-act="noop" style="margin-top:32px">다시 시도</button></div>`;
+// 질문 주소로 바로 들어왔는데 본문을 못 받음: 질문 머리(H-sub) 그대로, 뒤로는 목차
+const qFailView = () => ({ html: hsub(null, 'toc') + `<div class="empty">${stateIll('ill-notfound')}<h1 class="t-title2" tabindex="-1">질문을 불러오지 못했어요</h1><p class="t-ui c-2">인터넷 연결을 확인하고 다시 시도해 주세요</p><button class="btn l pri" data-act="noop" style="margin-top:32px">다시 시도</button></div>` });
+const sheetHtml = () => `<div class="scrim" data-act="closeSheet"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT"><h2 class="t-title2" id="shT" tabindex="-1">진도를 처음부터 다시 할까요?</h2><p class="t-ui c-2">읽음 ${S.read.size}문항, 헷갈림 ${S.conf.size}문항, 이어 읽기 위치가 모두 지워져요.</p><div class="bts"><button class="btn sec" data-act="closeSheet">취소</button><button class="btn del" data-act="doReset">초기화</button></div></div>`;
+const toastHtml = (msg, act) => `<div class="toast t-ui" role="status"><span>${msg}</span>${act ? `<button class="t-ui" data-act="${act[1]}">${act[0]}</button>` : ''}</div>`;
+
+// ===== 장면 목록: [id, 이름, 상태, 그리기, 덮개] =====
+const Q0 = ORDER[0];
+const SCENES = [
+  ['loading', '불러오는 중', 'mid', () => ({ html: loadingView() })],
+  ['home0', '첫 실행 홈', 'first', () => ({ html: homeView() })],
+  ['qTip', '처음 연 질문', 'first', () => qView(Q0, ctxOf('next', Q0))],
+  ['qFirstRead', '처음 다 읽음', 'first', () => { S.read.add(Q0); return { ...qView(Q0, ctxOf('next', Q0), { revealed: 1, fill: 9, justRead: Q0, first: 1 }), y: 'end' }; }],
+  ['home', '다시 연 홈', 'mid', () => ({ html: homeView() })],
+  ['homeMid', '홈 아래: 진도 · 다시 보기', 'mid', () => ({ html: homeView(), y: '[data-towers]', dy: -96 })],
+  ['homeEnd', '홈 맨 아래: 이 기기에 저장', 'mid', () => ({ html: homeView(), y: 'end' })],
+  ['heroLong', '히어로 102자 제목', 'long', () => ({ html: homeView() })],
+  ['homeDone', '40문항 다 읽음', 'done', () => ({ html: homeView() })],
+  ['resume', '이어 읽기 도착', 'mid', () => ({ ...qView('db-transaction', ctxOf('resume', 'db-transaction', 'home'), { revealed: 1, mark: 3, fill: 2.3 }), y: '[data-c="2"]', dy: -72 })],
+  ['random', '랜덤 질문', 'mid', () => qView('net-get-post', ctxOf('random'))],
+  ['randomOpen', '랜덤 답 펼침', 'mid', () => qView('net-get-post', ctxOf('random'), { revealed: 1, fill: .4 })],
+  ['toc', '목차 전체', 'mid', () => ({ html: tocView('all') })],
+  ['tocJump', '장 이동: 네트워크', 'mid', () => ({ html: tocView('all', { cur: 'net' }), y: '#ch-net', dy: -92 })],
+  ['q', '답 가림 (목차에서)', 'mid', () => qView('db-transaction', ctxOf('book'))],
+  ['qa', '답 펼침', 'mid', () => ({ ...qView('db-transaction', ctxOf('book'), { revealed: 1, fill: 1.2 }) })],
+  ['qFig', '도식 · 시뮬레이션 입구', 'mid', () => ({ ...qView('db-transaction', ctxOf('book'), { revealed: 1, fill: 4.6 }), y: '.fig', dy: -150 })],
+  ['qEnd', '끝: 한 칸 쌓임', 'mid', () => { S.read.add('db-transaction'); return { ...qView('db-transaction', ctxOf('book'), { revealed: 1, fill: 6, justRead: 'db-transaction', tails: [0] }), y: 'end' }; }],
+  ['qEndWait', '끝: 아직 안 쌓임', 'mid', () => ({ ...qView('db-transaction', ctxOf('book'), { revealed: 1, fill: 6 }), y: 'end' })],
+  ['qSubEnd', '과목 마지막 질문', 'mid', () => { const id = inSub('ds').slice(-1)[0].id; return { ...qView(id, ctxOf('book'), { revealed: 1, fill: 9 }), y: 'end' }; }],
+  ['qUnread', '읽음 취소 뒤', 'mid', () => { S.read.delete('ds-stack'); S.prog['ds-stack'] = 9; return { ...qView('ds-stack', ctxOf('book'), { revealed: 1, fill: 9 }), y: 'end', toast: toastHtml('읽음을 취소했어요', ['되돌리기', 'reread']) }; }],
+  ['qToast', '헷갈려요 처음 켬', 'mid', () => { S.seen.confToast = 0; S.conf.add('db-transaction'); return { ...qView('db-transaction', ctxOf('book'), { revealed: 1, fill: 1.2 }), toast: toastHtml('목차의 헷갈림만에서 모아 볼 수 있어요') }; }],
+  ['qLong', '가장 긴 제목 102자', 'mid', () => qView('db-bplus', ctxOf('star'))],
+  ['tocStar', '목차 빈출 20', 'mid', () => ({ html: tocView('star') })],
+  ['tocConf', '목차 헷갈림만', 'mid', () => ({ html: tocView('conf') })],
+  ['qConf', '헷갈림 복습 중', 'mid', () => qView('ds-collision', ctxOf('conf', 'ds-collision'))],
+  ['qConfLast', '헷갈림 복습 마지막', 'mid', () => { const l = ORDER.filter(isConf), id = l[l.length - 1]; return { ...qView(id, ctxOf('conf', id), { revealed: 1, fill: 9 }), y: 'end' }; }],
+  ['confEmpty', '헷갈림 0 (처음)', 'noconf', () => ({ html: tocView('conf') })],
+  ['confCleared', '헷갈림 0 (모두 풂)', 'cleared', () => ({ html: tocView('conf') })],
+  ['sims', '시뮬레이션 목록', 'mid', () => ({ html: simsView() })],
+  ['sim', '시뮬레이션 2단계', 'mid', () => simView('tcp-handshake', { step: 1 })],
+  ['simLast', '마지막 단계', 'mid', () => simView('tcp-handshake', { last: 1 })],
+  ['simTry', '직접 넣은 값', 'mid', () => simView('tcp-handshake', { tryv: ['120', '480'] })],
+  ['simErr', '입력 오류', 'mid', () => simView('tcp-handshake', { tryv: ['12a', ''] })],
+  ['simFail', '못 불러옴 (오프라인)', 'midOff', () => simView('tcp-handshake', { fail: 1 })],
+  ['simFig', '그림으로 보기', 'midOff', () => simView('tcp-handshake', { fig: 1 })],
+  ['resetSheet', '진도 초기화 확인', 'mid', () => ({ html: homeView(), y: 'end', over: sheetHtml() })],
+  ['resetDone', '초기화 뒤 되돌리기', 'firstSaved', () => ({ html: homeView(), toast: toastHtml('진도를 초기화했어요', ['되돌리기', 'undo']) })],
+  ['offline', '오프라인', 'midOff', () => ({ html: homeView() })],
+  ['offlineDone', '오프라인 저장 끝', 'mid', () => ({ html: homeView(), toast: toastHtml('이제 인터넷 없이도 볼 수 있어요') })],
+  ['update', '새 내용 알림', 'mid', () => ({ html: homeView(), toast: toastHtml('새 내용이 있어요', ['새로 고침', 'noop']) })],
+  ['qLoading', '질문 불러오는 중', 'mid', () => qLoadingView()],
+  ['simsLoading', '목록 불러오는 중', 'mid', () => ({ html: simsLoadingView() })],
+  ['loadFail', '내용을 못 불러옴', 'mid', () => ({ html: loadFailView() })],
+  ['qFail', '질문을 못 불러옴', 'mid', () => qFailView()],
+  ['notFound', '없는 질문 주소', 'mid', () => notFound('q')],
+  ['storageOff', '진도 저장 안 됨', 'midStore', () => ({ html: homeView() })],
+  ['storageBroken', '진도를 읽지 못함', 'broken', () => ({ html: homeView() })],
+];
+SEED.midOff = () => Object.assign(SEED.mid(), { net: 'off', off: 'saving', pct: 64 });
+SEED.midStore = () => Object.assign(SEED.mid(), { store: 'off' });
+SEED.firstSaved = () => mk({ seen: SEEN });
+SEED.broken = () => mk({ seen: SEEN, store: 'broken' });
+SEED.long = () => mk({ read: MID_READ, conf: ['ds-array-vs-ll', 'ds-collision', 'os-sync'], everConf: true, prog: { 'db-bplus': 2 }, last: { id: 'db-bplus', chunk: 2 }, seen: SEEN });
+const LANES = [
+  ['처음 실행과 다시 열기', 'loading,home0,qTip,qFirstRead,|다시 열면,home,homeMid,homeEnd,|긴 제목,heroLong,|모두 읽으면,homeDone'],
+  ['이어 읽기와 랜덤 질문 (홈에서)', 'home,resume,|랜덤 카드,random,randomOpen'],
+  ['목차 → 질문 (장 이동, 답 가림, 끝까지)', 'toc,tocJump,q,qa,qFig,qEndWait,qEnd,|과목 끝,qSubEnd,|읽음 취소,qUnread,|첫 헷갈려요,qToast,|긴 제목,qLong'],
+  ['빈출과 헷갈림 복습 (목차 거르기, 홈 다시 보기 줄)', 'homeMid,tocConf,qConf,qConfLast,|빈출,tocStar,|0개 처음,confEmpty,|모두 풂,confCleared'],
+  ['시뮬레이션 (실제 sims 페이지)', 'sims,sim,simLast,|직접 해 보기,simTry,simErr,|실패,simFail,simFig'],
+  ['이 기기에 저장: 초기화와 오프라인', 'homeEnd,resetSheet,resetDone,|오프라인,offline,offlineDone,|새 판,update'],
+  ['불러오기, 오류와 예외', '|불러오는 중,qLoading,simsLoading,|본문 실패,loadFail,qFail,|주소 오류,notFound,|저장 안 됨,storageOff,|저장값 깨짐,storageBroken'],
+];
+
+// ===== 장면 그리기 =====
+const phone = document.getElementById('phone');
+function screenEl(id, name) {
+  const s = document.createElement('section');
+  s.className = 'screen'; s.dataset.id = id; s.setAttribute('aria-label', name);
+  return s;
+}
+const scrollHtml = r => `<div class="scroll${r.bar ? ' has-bar' : ''}${r.cls ? ' ' + r.cls : ''}">${r.html}</div>${r.bar || ''}`;
+function build(sc, scene, opts = {}) {
+  const [id, name, seed, fn] = scene;
+  S = SEED[seed]();
+  if (opts.state) S = opts.state;
+  const v = fn();
+  const r = typeof v === 'string' ? { html: v } : v;
+  sc.innerHTML = scrollHtml(r) + `${r.over || ''}${r.toast ? r.toast.replace('class="toast', `class="toast${r.bar ? '' : ' nob'}`) : ''}`;
+  return r;
+}
+function settle(sc, r) {
+  const el = sc.querySelector('.scroll'), bar = sc.querySelector('[data-bar]');
+  if (bar) sc.style.setProperty('--barh', bar.offsetHeight + 'px');
+  if (r.y === 'end') el.scrollTop = el.scrollHeight;
+  else if (r.y) { const t = el.querySelector(r.y); if (t) el.scrollTop = t.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop + (r.dy || 0); }
+  const hm = sc.querySelector('.hm'); if (hm) hm.classList.toggle('cl', el.scrollTop > 12);
+  placeLines(sc);
+  contSegs(sc);
+  if (!SCROLL_TL) fallbackSegs(sc);
+  fullSegs(sc);
+  placeToast(sc);
+}
+// 진행 칸: 칸 하나의 폭이 12 미만이면 이어진 막대 하나로 (00 5.6, 글자 200% 히어로)
+function contSegs(sc) {
+  sc.querySelectorAll('.seg').forEach(s => { s.classList.remove('cont'); const i = s.firstElementChild; if (i && i.offsetWidth < 12) s.classList.add('cont'); });
+}
+// 탭 밑줄(글자 폭), 분할 조각(칸 번호만 바꿔 translateX, 늘리지 않음 00 5.7)
+function placeLines(sc, animate) {
+  sc.querySelectorAll('.hm .r2').forEach(nav => {
+    const a = nav.querySelector('[aria-current]'), s = a && a.querySelector('span'), ul = nav.querySelector('.ul');
+    if (!s || !ul) return;
+    if (!animate) ul.style.transition = 'none';
+    ul.style.transform = `translateX(${a.offsetLeft + s.offsetLeft}px) scaleX(${s.offsetWidth / 10})`;
+    if (!animate) { ul.offsetWidth; ul.style.transition = ''; }
+  });
+  sc.querySelectorAll('.segc').forEach(sg => {
+    const i = [...sg.querySelectorAll('button')].findIndex(b => b.getAttribute('aria-selected') === 'true'), th = sg.querySelector('.th');
+    if (!th || i < 0) return;
+    if (!animate) th.style.transition = 'none';
+    th.style.setProperty('--i', i);
+    if (!animate) { th.offsetWidth; th.style.transition = ''; }
+  });
+}
+// 질문 진행 칸: CSS 스크롤 연동이 되면 그것으로 (00 9.2-6), 안 되면 IntersectionObserver
+const SCROLL_TL = CSS.supports('animation-timeline: --a') && CSS.supports('view-timeline: --a block');
+if (SCROLL_TL) {
+  const st = document.createElement('style');
+  st.textContent = `.scroll { timeline-scope: ${Array.from({ length: 10 }, (_, i) => '--c' + i).join(', ')}; }` + Array.from({ length: 10 }, (_, i) => `.seg.live i:nth-child(${i + 1}) b { transform: none; animation: segfill linear both; animation-timeline: --c${i}; animation-range: exit-crossing 0% exit-crossing 100%; }`).join('') + '.seg.full i b { animation: none !important; transform: none !important; }';
+  document.head.appendChild(st);
+}
+function fallbackSegs(sc) {
+  const el = sc.querySelector('.scroll'), seg = sc.querySelector('.seg.live');
+  if (!seg) return;
+  const line = el.getBoundingClientRect().top + el.clientHeight * .35;
+  seg.querySelectorAll('i b').forEach((b, i) => {
+    const c = el.querySelector(`[data-c="${i}"]`); if (!c) return;
+    const r = c.getBoundingClientRect();
+    b.style.setProperty('--f', r.bottom < line ? 1 : r.top < line ? (line - r.top) / r.height : 0);
+  });
+}
+// 끝 영역이 보이면 진행 칸을 모두 채운다 (마지막 단락은 읽기 선을 못 지나므로, 00 9.2-6)
+function fullSegs(sc, on) {
+  const s = sc.querySelector('.seg.live'), e = sc.querySelector('[data-end]');
+  if (!s || !e) return;
+  if (on == null) { const a = sc.querySelector('.scroll').getBoundingClientRect(), b = e.getBoundingClientRect(); on = b.top < a.bottom && b.bottom > a.top; }
+  s.classList.toggle('full', on);
+}
+// 시뮬레이션: 단계가 바뀌면 바뀐 물체가 막대 위 12 와 머리 아래 12 사이에 오게 스크롤 (05 4절)
+// 바뀐 물체 = 무대에서 눈에 보이게 달라진 곳. 무언가를 그리는 요소(글, 바탕, 테두리, 그림자, 가상 요소, SVG 도형)를 트리 자리로 맞춰
+// 보임(조상 opacity 곱, visibility, 크기), 글, 색(채널 차 24 넘게), 자리·크기를 비교한다. 부모 class 로 드러난 것도 잡고, 사라진 것은 직전 자리.
+// 바탕·테두리가 그대로이고 글만 바뀌면 글자 상자만 쓴다(빈 칸까지 넓게 잡으면 큰 묶음이 되어 위아래가 잘림)
+const rgb = s => (s.match(/[\d.]+/g) || [0, 0, 0, 0]).map(Number).concat([1]).slice(0, 4);
+const cdist = (a, b) => Math.max(...[0, 1, 2].map(i => Math.abs(a[i] - b[i])));
+function stageSnap(stage, W) {
+  // 들어오는 움직임(sim-pop 등) 중간이 아니라 끝 모습으로 잰다: 같은 순간 안에서 끝으로 돌렸다가 되돌리므로 화면은 깜빡이지 않음
+  const anims = stage.getAnimations({ subtree: true }).filter(a => isFinite(a.effect.getComputedTiming().endTime)), keep = anims.map(a => a.currentTime);
+  anims.forEach(a => { a.currentTime = a.effect.getComputedTiming().endTime; });
+  const m = new Map(), s0 = stage.getBoundingClientRect(), doc = stage.ownerDocument;
+  let base = [255, 255, 255, 1];
+  for (let x = stage; x; x = x.parentElement) { const c = rgb(W.getComputedStyle(x).backgroundColor); if (c[3] > .5) { base = c; break; } }
+  (function walk(el, path, op, bg) {
+    [...el.children].forEach((c, i) => {
+      const p = path + '/' + i, cs = W.getComputedStyle(c), o = op * +cs.opacity, own = rgb(cs.backgroundColor);
+      const eff = own[3] > .5 ? own : bg, texts = [...c.childNodes].filter(n => n.nodeType === 3 && n.data.trim());
+      const pse = ['::before', '::after'].map(x => { const s = W.getComputedStyle(c, x); return s.content === 'none' ? '' : s.content + s.backgroundColor + s.borderTopColor; }).join('');
+      const side = ['Top', 'Right', 'Bottom', 'Left'].find(k => parseFloat(cs['border' + k + 'Width']) > 0), bw = !!side, bc = rgb(cs['border' + (side || 'Top') + 'Color']);
+      const svg = c instanceof W.SVGGeometryElement || c instanceof W.SVGTextContentElement || /^(IMG|CANVAS|INPUT|image|use)$/.test(c.tagName);
+      const boxy = svg || own[3] > .05 || cs.backgroundImage !== 'none' || cs.boxShadow !== 'none' || (bw && bc[3] > .05) || !!pse;
+      if (boxy || texts.length) {
+        const r = c.getBoundingClientRect(), vis = cs.visibility !== 'hidden' && o > .05 && (r.width > 0 || r.height > 0);
+        let tr = null;
+        texts.forEach(n => { const g = doc.createRange(); g.selectNode(n); const q = g.getBoundingClientRect(); if (q.height) tr = tr ? { top: Math.min(tr.top, q.top), bottom: Math.max(tr.bottom, q.bottom), left: Math.min(tr.left, q.left), right: Math.max(tr.right, q.right) } : { top: q.top, bottom: q.bottom, left: q.left, right: q.right }; });
+        const ink = svg || texts.length || cs.backgroundImage !== 'none' || cs.boxShadow !== 'none' || !!pse || (bw && bc[3] > .05 && cdist(bc, bg) > 24) || (own[3] > .05 && cdist(own, bg) > 24); // 바탕과 거의 같은 색(채널 차 24 이하) 판·선만 있는 것은 눈에 안 띔
+        m.set(p, { vis, r, tr, boxy, ink, op: o, bg: eff, ownBg: own[3] > .05, bc: bw && bc[3] > .05 ? bc : null, sh: cs.boxShadow, pse, paint: svg ? cs.fill + cs.stroke : '',
+          txt: texts.map(n => n.data).join('').trim(), color: rgb(cs.color), fw: cs.fontWeight, geo: [r.left - s0.left, r.top - s0.top, r.width, r.height].map(Math.round).join(','), pop: !!c.closest('.sim-pop') });
+      }
+      walk(c, p, o, eff);
+    });
+  })(stage, '', 1, base);
+  anims.forEach((a, i) => { a.currentTime = keep[i]; });
+  return m;
+}
+function stageDiff(prev, now) {
+  const ch = [], pop = [], add = (r, v) => { if (!r) return; ch.push(r); if (v && v.pop) pop.push(r); };
+  const gone = o => o.ink && add(o.boxy ? o.r : o.tr || o.r);
+  now.forEach((v, p) => {
+    const o = prev.get(p);
+    if (!v.vis) { if (o && o.vis) gone(o); return; }
+    if (!o || !o.vis) return v.ink && add(v.r, v);
+    const moved = v.geo !== o.geo, opCh = Math.abs(v.op - o.op) > .1;
+    const boxCh = (v.boxy || o.boxy) && (moved || opCh || v.sh !== o.sh || v.pse !== o.pse || v.paint !== o.paint || ((v.ownBg || o.ownBg) && cdist(v.bg, o.bg) > 24) || (!v.bc !== !o.bc) || (v.bc && o.bc && cdist(v.bc, o.bc) > 24));
+    if (boxCh && (v.ink || o.ink)) { add(v.r, v); if (moved) add(o.r); return; } // 바탕과 거의 같은 색 판이 자라거나 옮긴 것은 그 안 글·도형이 따로 잡힌다
+    if (v.txt && (moved || v.txt !== o.txt || v.fw !== o.fw || opCh || cdist(v.color, o.color) > 24)) { add(v.tr || v.r, v); if (moved || v.txt !== o.txt) add(o.tr); }
+  });
+  prev.forEach((o, p) => { if (o.vis && !now.has(p)) gone(o); });
+  const low = ch.reduce((x, r) => (!x || r.bottom > x.bottom ? r : x), null); // 가장 아래 바뀐 것(새로 붙은 줄이 흔히 여기)
+  return { ch, pop, low };
+}
+// 그림자·글자 가장자리까지 덮게 위아래 6 을 더한다
+function unionRect(rs, fr) {
+  const f = fr.getBoundingClientRect(), k = f.width / fr.offsetWidth || 1;
+  let top = Infinity, bottom = -Infinity, left = Infinity, right = -Infinity;
+  rs.forEach(r => { top = Math.min(top, f.top + (r.top - 6) * k); bottom = Math.max(bottom, f.top + (r.bottom + 6) * k); left = Math.min(left, f.left + r.left * k); right = Math.max(right, f.left + r.right * k); });
+  return { top, bottom, left, right };
+}
+// 좁은 열(글자 200%)에서 무대가 옆으로 밀릴 때: 새 물체(없으면 바뀐 묶음)의 가로 범위가 보이게, 넓으면 가운데로
+function showX(sc, x) {
+  const st = sc.querySelector('.stage[data-stage]'); if (!st || st.scrollWidth <= st.clientWidth + 1 || !isFinite(x.left)) return;
+  const k = sc.getBoundingClientRect().width / sc.offsetWidth || 1, s = st.getBoundingClientRect();
+  const d = x.right - x.left > s.width ? (x.left + x.right - s.left - s.right) / 2 : x.right > s.right ? x.right - s.right : x.left < s.left ? x.left - s.left : 0;
+  st.scrollLeft += d / k;
+}
+// u = 바뀐 묶음, f = 새 물체(kit 의 .sim-pop), l = 가장 아래 바뀐 것. u 가 자리보다 크면 u 가운데를 보이되
+// f 와 l 이 같이 들어가면 둘 다, 아니면 f 를 다 보이게
+function showRect(sc, u, smooth, f, l) {
+  const el = sc.querySelector('.scroll'), bar = sc.querySelector('[data-bar]'), hd = sc.querySelector('.hs');
+  if (!bar || !hd || !isFinite(u.top)) return;
+  const k = sc.getBoundingClientRect().width / sc.offsetWidth || 1;
+  const top0 = getComputedStyle(hd).position === 'sticky' ? hd.getBoundingClientRect().bottom : el.getBoundingClientRect().top, bot0 = bar.getBoundingClientRect().top;
+  const room = bot0 - top0, h = u.bottom - u.top;
+  let d = 0;
+  if (h <= room) {
+    const m = Math.min(12 * k, (room - h) / 2);
+    if (u.bottom > bot0 - m) d = u.bottom - (bot0 - m);
+    else if (u.top < top0 + m) d = u.top - (top0 + m);
+  } else {
+    // 바뀐 묶음 가운데에 맞추되, 새 물체(f)가 있으면 그것은 다 보이게
+    const fit = [f, l].filter(x => x && isFinite(x.top) && x.bottom - x.top <= room);
+    const keep = fit.length === 2 && Math.max(f.bottom, l.bottom) - Math.min(f.top, l.top) > room ? [f] : fit;
+    let w = (u.top + u.bottom - room) / 2;
+    if (keep.length) w = Math.min(Math.max(w, Math.max(...keep.map(x => x.bottom)) - room), Math.min(...keep.map(x => x.top)));
+    d = w - top0;
+  }
+  if (Math.abs(d) < 1) return;
+  el.scrollBy({ top: d / k, behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' });
+}
+// 시뮬레이션 iframe: kit 머리·조작을 숨기고 앱 막대가 대신 그린다 (05 7절)
+function mountSim(sc) {
+  const fr = sc.querySelector('iframe[data-sim]'); if (!fr) return;
+  const bar = sc.querySelector('[data-simbar]'), smooth = sc === phoneScreen;
+  const onload = () => {
+    let doc; try { doc = fr.contentDocument; } catch (e) { return; }
+    if (!doc || !doc.querySelector('.sim-ctrl') || fr.dataset.ready) return;
+    fr.dataset.ready = 1;
+    if (!doc.getElementById('v2css')) { const st = doc.createElement('style'); st.id = 'v2css'; st.textContent = SIM_CSS; doc.head.appendChild(st); }
+    const W = doc.defaultView, page = doc.querySelector('.sim-page'), stage = doc.querySelector('#sim-stage'), form = doc.querySelector('form.sim-try');
+    if (form) wireTryErrors(form, W);
+    const fit = () => { fr.style.height = Math.ceil(page.getBoundingClientRect().height) + 'px'; };
+    new ResizeObserver(fit).observe(page); fit();
+    // 직접 해 보기로 단계를 바꾸면 꼬리표 `직접 넣은 값` (모드 바꿈, 처음부터는 끔)
+    const SimApi = W.eval('Sim'), load0 = SimApi.load; SimApi.load = l => { fr._tried = true; load0(l); }; // kit 의 Sim 은 const 라 window 속성이 아님
+    const sync = () => {
+      if (!bar) return;
+      const [a, n] = (doc.querySelector('.sim-count').textContent || '1 / 1').split('/').map(x => +x.trim());
+      const cap = bar.querySelector('[data-cap]'), t = doc.querySelector('.sim-cap').textContent;
+      if (cap.textContent !== t) { cap.textContent = t; cap.classList.remove('swap'); cap.offsetWidth; cap.classList.add('swap'); }
+      const cf = sc.querySelector('[data-capflow]'); if (cf) cf.querySelector('[data-capf]').textContent = t;
+      bar.querySelector('[data-count]').textContent = `${n}단계 중 ${a}번째`;
+      bar.querySelector('[data-segs]').outerHTML = `<span class="seg" data-segs role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${a}" aria-valuetext="${n}단계 중 ${a}번째">${Array.from({ length: n }, (_, i) => `<i><b style="--f:${i < a ? 1 : 0}"></b></i>`).join('')}</span>`;
+      const last = a === n, bts = bar.querySelectorAll('.bts .btn'), st1 = bar.querySelector('.st1');
+      st1.querySelectorAll('.tag,[data-k=try]').forEach(x => x.remove());
+      if (fr._tried) st1.insertAdjacentHTML('beforeend', '<span class="tag here">직접 넣은 값</span>');
+      if (last && form) st1.insertAdjacentHTML('beforeend', '<button class="lnk t-label" data-act="sim" data-k="try">직접 해 보기</button>');
+      if (cf) { cf.querySelector('[data-k=try]').hidden = !(last && form); cf.querySelector('[data-ctag]').hidden = !fr._tried; }
+      bts[0].disabled = a === 1;
+      const playing = /일시정지/.test(doc.querySelector('[data-act=play]').textContent);
+      bts[1].outerHTML = last ? `<button class="btn sec" data-act="sim" data-k="restart">처음부터</button>` : `<button class="btn sec ico" data-act="sim" data-k="play" aria-label="${playing ? '멈춤' : '재생'}">${ic(playing ? 'pause' : 'play')}</button>`;
+      const nb = bar.querySelectorAll('.bts .btn')[2];
+      nb.innerHTML = (last ? '글로 읽기' : '다음') + ic('next');
+      nb.dataset.k = last ? 'toq' : 'next';
+      sc.style.setProperty('--barh', bar.offsetHeight + 'px');
+      contSegs(sc);
+    };
+    let prev = stageSnap(stage, W);
+    const reveal = () => {
+      const now = stageSnap(stage, W), { ch, pop, low } = stageDiff(prev, now);
+      prev = now;
+      if (!ch.length || !bar) return;
+      fit();
+      const u = unionRect(ch, fr), cf = sc.querySelector('[data-capflow]');
+      // 좁은 열에서는 무대 위 흐름의 단계 설명도 같이 보이게 (자리가 되면)
+      if (cf && cf.offsetHeight) { const r = cf.getBoundingClientRect(); u.top = Math.min(u.top, r.top); u.bottom = Math.max(u.bottom, r.bottom); }
+      const pu = pop.length ? unionRect(pop, fr) : null;
+      showX(sc, pu || u);
+      showRect(sc, u, smooth, pu, unionRect([low], fr));
+    };
+    // 막대 글을 먼저 바꾸고(막대 높이 확정) 그다음 바뀐 물체 위치를 본다: 관찰자 만든 순서대로 불림
+    new MutationObserver(sync).observe(doc.querySelector('.sim-say'), { subtree: true, childList: true, characterData: true });
+    new MutationObserver(sync).observe(doc.querySelector('[data-act=play]'), { childList: true });
+    new MutationObserver(reveal).observe(stage, { subtree: true, childList: true, characterData: true, attributes: true });
+    const next = doc.querySelector('[data-act=next]');
+    if (fr.dataset.last) { let g = 0; while (!next.disabled && g++ < 40) next.click(); }
+    else for (let i = 0; i < +fr.dataset.step; i++) next.click();
+    const modes = [...doc.querySelectorAll('.sim-tabs button')];
+    const mBox = sc.querySelector('[data-modes]');
+    if (modes.length > 1 && mBox) {
+      const sel = modes.findIndex(b => b.getAttribute('aria-pressed') === 'true');
+      mBox.innerHTML = segc(modes.map((b, i) => [String(i), b.textContent]), String(sel), 'mode');
+      placeLines(sc);
+    }
+    if (fr.dataset.tryv && form) {
+      const [x, y] = fr.dataset.tryv.split(','), ins = form.querySelectorAll('input');
+      ins[0].value = x; if (ins[1]) ins[1].value = y;
+      form.requestSubmit(); SimApi.play(false); prev = stageSnap(stage, W);
+      if (!fr._tried) { const f = fr.getBoundingClientRect(), r = form.getBoundingClientRect(), el = sc.querySelector('.scroll'), k = f.width / fr.offsetWidth || 1; el.scrollTop += (f.top + r.top * k - sc.querySelector('.hs').getBoundingClientRect().bottom) / k - 12; }
+    }
+    sync();
+  };
+  fr.addEventListener('load', onload);
+  try { if (fr.contentDocument && fr.contentDocument.readyState === 'complete') onload(); } catch (e) {}
+}
+
+// ===== 왼쪽 폰: 장면 + 실제로 눌러 보기 =====
+let cur = null, stack = [], live = {};
+const phoneScreen = screenEl('live', '폰');
+phone.appendChild(phoneScreen);
+phoneScreen.classList.add('on');
+const scrollEl = () => phoneScreen.querySelector('.scroll');
+const seenHome = new Set();
+function show(sceneId, keepStack) {
+  const sc = SCENES.find(s => s[0] === sceneId); if (!sc) return;
+  const r = build(phoneScreen, sc);
+  live = { scene: sceneId, route: null, ctx: null, opts: {} };
+  cur = sceneId;
+  if (!keepStack) stack = [];
+  document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('cur', t.dataset.id === sceneId));
+  settle(phoneScreen, r); wire(phoneScreen); mountSim(phoneScreen);
+  if (sceneId === 'resume') hereFade(phoneScreen);
+}
+// 실제 이동 (00 7절)
+function paint(route, opts = {}) {
+  const [path, qs] = route.split('?'), p = new URLSearchParams(qs || ''), [kind, arg] = path.split('/');
+  let r;
+  if (kind !== 'home') { undoBox = null; clearTimeout(toastT); } // 되돌리기는 홈을 떠나면 버린다 (06 4절)
+  if (kind === 'home') r = { html: homeView({ pop: opts.pop }) };
+  else if (kind === 'toc') r = { html: tocView(arg && ['star', 'conf'].includes(arg) ? arg : 'all', { cur: KEYS.includes(arg) ? arg : 'ds', anim: opts.anim }), y: KEYS.includes(arg) ? '#ch-' + arg : null, dy: -92 };
+  else if (kind === 'sims') r = { html: simsView() };
+  else if (kind === 'sim') r = simView(arg, { fig: p.get('fig') });
+  else if (kind === 'q') {
+    const c = p.get('ctx') || 'book';
+    const ctx = live.ctx && live.ctx.kind === c && opts.keepCtx ? live.ctx : ctxOf(c, arg, p.get('from'));
+    const resume = c === 'resume' && S.last && S.last.id === arg;
+    const simJump = c === 'sim';
+    const o = { revealed: resume || simJump || opts.revealed || p.get('open'), mark: resume ? S.last.chunk : 0, anim: opts.anim, tails: opts.tails, justRead: opts.justRead, popConf: opts.popConf };
+    r = qView(arg, ctx.kind === 'resume' || ctx.kind === 'sim' ? { kind: 'book', list: ORDER, from: ctx.from } : ctx, o);
+    if (resume) { r.y = `[data-c="${S.last.chunk - 1}"]`; r.dy = -72; }
+    if (simJump) { r.y = '.fig'; r.dy = -150; }
+    live.ctx = ctx; live.qid = arg; live.revealed = o.revealed; live.book = ctx.list === ORDER || ctx.kind === 'resume' || ctx.kind === 'sim';
+  }
+  live.route = route; live.opts = opts;
+  const keepY = opts.y != null ? opts.y : null;
+  phoneScreen.innerHTML = scrollHtml(r);
+  settle(phoneScreen, keepY != null ? {} : r);
+  if (keepY != null) { scrollEl().scrollTop = keepY; const hm = phoneScreen.querySelector('.hm'); if (hm) hm.classList.toggle('cl', keepY > 12); }
+  wire(phoneScreen); mountSim(phoneScreen);
+  if (kind === 'q' && live.ctx && live.ctx.kind === 'resume') hereFade(phoneScreen);
+  if (kind === 'home' && !seenHome.has('t')) { seenHome.add('t'); stackIn(phoneScreen); }
+  const h1 = phoneScreen.querySelector('h1[tabindex]'); if (h1 && opts.focus !== false) h1.focus({ preventScroll: true });
+}
+function go(route, replace, opts = {}) {
+  if (!replace) stack.push({ route: live.route, scene: live.route ? null : cur, y: scrollEl().scrollTop, opts: live.opts });
+  if (live.route == null && !replace) stack[stack.length - 1].scene = cur;
+  paint(route, opts);
+}
+function back() {
+  const p = stack.pop();
+  if (!p) { paint(live.route && live.route.startsWith('q/') ? 'toc' : 'home'); return; }
+  if (p.scene) { show(p.scene, true); return; }
+  paint(p.route, { ...p.opts, y: p.y, anim: false });
+}
+// `멈춘 곳` 은 첫 터치(또는 휠·키)까지 남는다. 시간으로 지우지 않는다 (UX 4)
+function hereFade(sc) {
+  const t = sc.querySelector('[data-here]'); if (!t) return;
+  const evs = ['pointerdown', 'wheel', 'keydown'];
+  const off = () => { t.style.transition = 'opacity var(--fade) var(--std)'; t.style.opacity = 0; evs.forEach(e => sc.removeEventListener(e, off)); };
+  evs.forEach(e => sc.addEventListener(e, off, { passive: true }));
+}
+function stackIn(sc) {
+  const tw = sc.querySelector('[data-towers]'); if (!tw) return;
+  const io = new IntersectionObserver(es => { if (es[0].intersectionRatio >= .5) { tw.classList.add('stackin'); io.disconnect(); } }, { root: sc.querySelector('.scroll'), threshold: [.5] });
+  io.observe(tw);
+}
+// 머리 접힘 (IntersectionObserver, 스크롤 이벤트 없음)
+function wire(sc) {
+  const el = sc.querySelector('.scroll'), sent = sc.querySelector('[data-sent]'), hm = sc.querySelector('.hm');
+  if (sent && hm) new IntersectionObserver(es => hm.classList.toggle('cl', !es[0].isIntersecting), { root: el, rootMargin: '-12px 0px 0px 0px' }).observe(sent);
+  // 목차·시뮬레이션 목록: 지금 장 (읽기 선 35%)
+  const jump = sc.querySelector('.jump');
+  if (jump) {
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) jump.querySelectorAll('a').forEach(a => a.toggleAttribute('aria-current', a.dataset.k === e.target.dataset.ch)); }), { root: el, rootMargin: '-35% 0px -64% 0px' });
+    sc.querySelectorAll('[data-ch]').forEach(s => io.observe(s));
+  }
+  if (!SCROLL_TL && sc.querySelector('.seg.live')) new IntersectionObserver(() => fallbackSegs(sc), { root: el, threshold: Array.from({ length: 21 }, (_, i) => i / 20) }).observe(sc.querySelector('.prose') || el);
+  const end = sc.querySelector('[data-end]');
+  if (end) new IntersectionObserver(es => fullSegs(sc, es[0].isIntersecting), { root: el }).observe(end);
+  // 읽음 판정 (00 6.3): 끝 영역이 50% 보이고 답을 연 뒤 시간이 차면
+  if (end && live.qid && !isRead(live.qid)) {
+    const q = Q[live.qid], need = Math.max(10000, minutes(q) * 60000 * .3), t0 = live.t0 || Date.now(); live.t0 = t0;
+    let tm = null;
+    new IntersectionObserver(es => {
+      clearTimeout(tm);
+      if (es[0].intersectionRatio >= .5) tm = setTimeout(() => { if (isRead(live.qid)) return; S.read.add(live.qid); const first = !S.seen.firstRead; S.seen.firstRead = 1; sc.querySelector('[data-end]').outerHTML = endZone(q, { justRead: live.qid, first, revealed: 1, book: live.book }); }, Math.max(0, need - (Date.now() - t0)));
+    }, { root: el, threshold: [0, .5] }).observe(end);
+  }
+}
+function placeToast(sc) {
+  const t = sc.querySelector('.toast'); if (!t) return;
+  const bar = sc.querySelector('[data-bar]'), end = sc.querySelector('[data-end]'), hd = sc.querySelector('.hm, .hs');
+  const endIn = end && bar && end.getBoundingClientRect().top < bar.getBoundingClientRect().top;
+  const up = !bar || endIn;
+  t.classList.toggle('top', up); t.classList.toggle('nob', !bar && !up);
+  if (up) t.style.setProperty('--tt', ((hd && getComputedStyle(hd).position === 'sticky' ? hd.offsetHeight - (hd.classList.contains('cl') ? 44 : 0) : 0) + 12) + 'px');
+}
+// 알림 한 줄 (00 5.11): 2.4초, 동작이 있으면 5초. 초기화 되돌리기는 10초이고 누르거나 초점이 있는 동안 멈춘다 (06 4절)
+let toastT = null, undoBox = null;
+function toast(msg, act) {
+  phoneScreen.querySelectorAll('.toast').forEach(t => t.remove()); clearTimeout(toastT);
+  const bar = phoneScreen.querySelector('[data-bar]');
+  phoneScreen.insertAdjacentHTML('beforeend', toastHtml(msg, act).replace('class="toast', `class="toast${bar ? '' : ' nob'}`));
+  placeToast(phoneScreen);
+  const el = phoneScreen.querySelector('.toast'), undo = act && act[1] === 'undo';
+  let left = undo ? 10000 : act ? 5000 : 2400, t0 = 0, held = false;
+  const kill = () => { el.remove(); if (undo) undoBox = null; };
+  const run = () => { held = false; clearTimeout(toastT); t0 = Date.now(); toastT = setTimeout(kill, left); };
+  const hold = () => { if (held) return; held = true; clearTimeout(toastT); left -= Date.now() - t0; };
+  if (act) { ['pointerdown', 'focusin'].forEach(e => el.addEventListener(e, hold)); ['pointerup', 'pointercancel', 'focusout'].forEach(e => el.addEventListener(e, run)); }
+  run();
+}
+const endRedraw = (o = {}) => { const end = phoneScreen.querySelector('[data-end]'); if (end) end.outerHTML = endZone(Q[live.qid], { ...o, revealed: 1, book: live.book }); };
+const ACT = {
+  back: () => back(),
+  noop: () => {},
+  reveal: b => {
+    const rc = b.closest('.recall'); if (!rc || rc.dataset.out) return; rc.dataset.out = 1;
+    const y = scrollEl().scrollTop;
+    const open = () => { if (!rc.isConnected) return; live.t0 = Date.now(); if (live.qid) { S.prog[live.qid] = Math.max(S.prog[live.qid] || 0, 1); S.seen.recallTip = 1; } paint(live.route, { ...live.opts, revealed: 1, anim: 1, keepCtx: 1, y }); };
+    rc.style.transition = 'opacity var(--fade) var(--std)'; rc.style.opacity = 0;
+    rc.addEventListener('transitionend', e => { if (e.target === rc) open(); }); setTimeout(open, 200); // transitionend 가 안 오면(움직임 줄이기 1ms 등) 대비
+  },
+  hide: () => { paint(live.route, { ...live.opts, revealed: 0, keepCtx: 1 }); phoneScreen.querySelector('[data-act=reveal]').focus(); },
+  tail: b => { const j = +b.dataset.j, t = new Set(live.opts.tails || []); t.has(j) ? t.delete(j) : t.add(j); paint(live.route, { ...live.opts, revealed: 1, tails: [...t], keepCtx: 1, y: scrollEl().scrollTop, focus: false }); phoneScreen.querySelector(`[data-act=tail][data-j="${j}"]`).focus(); },
+  conf: b => { const id = live.qid || b.closest('.screen').querySelector('[data-q]')?.dataset.q; if (!id) return; const on = !isConf(id); on ? S.conf.add(id) : S.conf.delete(id); if (on) S.everConf = true; b.setAttribute('aria-pressed', on); b.innerHTML = ic(on ? 'check' : 'help') + '<span class="lbl">헷갈려요</span>'; b.classList.remove('popi'); b.offsetWidth; b.classList.add('popi'); if (on && !S.seen.confToast) { S.seen.confToast = 1; toast('목차의 헷갈림만에서 모아 볼 수 있어요'); } },
+  unread: () => { S.read.delete(live.qid); endRedraw(); toast('읽음을 취소했어요', ['되돌리기', 'reread']); },
+  markRead: () => { S.read.add(live.qid); const first = !S.seen.firstRead; S.seen.firstRead = 1; endRedraw({ justRead: live.qid, first }); },
+  reread: () => { S.read.add(live.qid); endRedraw(); phoneScreen.querySelectorAll('.toast').forEach(t => t.remove()); },
+  another: () => go(`q/${pickRandom()}?ctx=random&from=home`, true),
+  shuffle: b => {
+    if (b.dataset.busy) return; b.dataset.busy = 1;
+    const card = phoneScreen.querySelector('.rnd .card'), box = card.querySelector('.swap');
+    box.classList.add('out');
+    setTimeout(() => { const id = pickRandom(); box.innerHTML = rndInner(id); card.dataset.go = `q/${id}?ctx=random&from=home`; card.setAttribute('aria-label', `랜덤 질문, ${Q[id].title}, 답은 가려져 있어요`); box.classList.remove('out'); box.classList.add('in'); phoneScreen.querySelector('[data-live]').textContent = '새 질문: ' + Q[id].title; box.addEventListener('animationend', () => { box.classList.remove('in'); delete b.dataset.busy; }, { once: true }); }, 120);
+  },
+  tocview: b => {
+    // 분할 조각을 먼저 미끄러뜨리고 목록을 바꾼다 (replaceState 와 같음: 기록을 쌓지 않음)
+    const sg = b.closest('.segc'), v = b.dataset.v;
+    if (sg) { sg.querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', x === b)); placeLines(phoneScreen, true); }
+    setTimeout(() => { paint(v === 'all' ? 'toc' : 'toc/' + v, { anim: 1, focus: false }); }, sg ? 160 : 0);
+  },
+  jump: b => { const t = phoneScreen.querySelector('#ch-' + b.dataset.k), el = scrollEl(); if (!t) return; el.scrollTo({ top: t.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 92, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); },
+  reset: () => { phoneScreen.insertAdjacentHTML('beforeend', sheetHtml()); phoneScreen.querySelector('#shT').focus(); },
+  closeSheet: () => { phoneScreen.querySelectorAll('.scrim,.sheet').forEach(e => e.remove()); phoneScreen.querySelector('[data-act=reset]')?.focus(); },
+  doReset: () => { undoBox = S; S = Object.assign(mk({ seen: S.seen }), { off: S.off, net: S.net }); paint('home'); toast('진도를 초기화했어요', ['되돌리기', 'undo']); },
+  undo: () => { if (undoBox) { S = undoBox; undoBox = null; paint('home'); } phoneScreen.querySelectorAll('.toast').forEach(t => t.remove()); clearTimeout(toastT); },
+  closeNote: b => b.closest('.note').remove(),
+  mode: b => { const fr = phoneScreen.querySelector('iframe'); fr._tried = false; try { fr.contentDocument.querySelectorAll('.sim-tabs button')[+b.dataset.v].click(); } catch (e) {} b.closest('.segc').querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', x === b)); placeLines(phoneScreen, true); },
+  sim: b => {
+    const k = b.dataset.k, fr = phoneScreen.querySelector('iframe');
+    if (k === 'toq') { go(b.dataset.q || phoneScreen.querySelector('[data-q]').dataset.q); return; }
+    let doc; try { doc = fr.contentDocument; } catch (e) { return; }
+    if (k === 'restart') { fr._tried = false; doc.defaultView.eval('Sim').reset(); return; }
+    if (k === 'try') { // 직접 해 보기 폼으로: 폼 윗변을 머리 아래로, 초점은 첫 입력 (05 4절)
+      const f = doc.querySelector('form.sim-try'), el = scrollEl();
+      el.scrollBy({ top: fr.getBoundingClientRect().top + f.getBoundingClientRect().top - phoneScreen.querySelector('.hs').getBoundingClientRect().bottom - 12, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      f.querySelector('input,select,button')?.focus({ preventScroll: true });
+      return;
+    }
+    doc.querySelector(`[data-act=${k}]`).click();
+  },
+};
+// 화면이 꺼지거나 앱을 떠나면 자동 재생을 멈춘다 (05 5절)
+const stopPlay = () => { try { phoneScreen.querySelector('iframe[data-sim]')?.contentWindow.eval('Sim').play(false); } catch (e) {} };
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopPlay(); });
+addEventListener('pagehide', stopPlay);
+phone.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]');
+  if (g && phoneScreen.contains(g)) {
+    e.preventDefault(); if (g.disabled || !g.dataset.go) return;
+    const route = g.dataset.go, replace = g.hasAttribute('data-replace');
+    const q = route.startsWith('q/');
+    go(route, replace, { anim: q ? 0 : 1, keepCtx: replace });
+    return;
+  }
+  const b = e.target.closest('[data-act]');
+  if (b && phoneScreen.contains(b) && !b.disabled) { e.preventDefault(); ACT[b.dataset.act] && ACT[b.dataset.act](b); }
+});
+phone.addEventListener('keydown', e => { if (e.key === 'Escape' && phoneScreen.querySelector('.sheet')) ACT.closeSheet(); });
+
+// ===== 흐름 지도: 장면마다 그려 복제한 썸네일 =====
+const lanes = document.getElementById('lanes');
+lanes.innerHTML = LANES.map(([t, ids]) => `<div class="lane"><h2>${t}</h2><div class="rowx">${ids.split(',').map((id, i, a) => {
+  if (id[0] === '|') return `<span class="branch">${id.slice(1)}</span>`;
+  const sc = SCENES.find(s => s[0] === id), arrow = i < a.length - 1 && a[i + 1][0] !== '|' ? '<span class="arrow" aria-hidden="true">→</span>' : '';
+  return `<div class="thumb" data-id="${id}" role="button" tabindex="0" aria-label="${sc[1]} 장면 보기"><div class="tf"></div><span>${sc[1]}</span></div>${arrow}`;
+}).join('')}</div></div>`).join('');
+const P = new URLSearchParams(location.search);
+if (P.has('only')) document.body.classList.add('only');
+if (P.has('map')) document.body.classList.add('maponly');
+if (P.has('safe')) phone.classList.add('safe');
+if (!P.has('only')) document.fonts.ready.then(() => {
+  document.querySelectorAll('.thumb').forEach(t => {
+    const sc = SCENES.find(s => s[0] === t.dataset.id), el = screenEl(sc[0], sc[1]);
+    el.setAttribute('inert', ''); el.classList.add('on');
+    t.querySelector('.tf').appendChild(el);
+    const r = build(el, sc);
+    settle(el, r); mountSim(el);
+  });
+});
+document.addEventListener('click', e => {
+  const t = e.target.closest('.thumb'); if (t) { show(t.dataset.id); return; }
+  const sf = e.target.closest('[data-safe]');
+  if (sf) { const on = phone.classList.toggle('safe'); sf.setAttribute('aria-pressed', on); show(cur, true); return; }
+  const w = e.target.closest('[data-w]');
+  if (w) { const sz = { 390: [390, 844], 375: [375, 667], 360: [360, 780] }[w.dataset.w]; phone.style.setProperty('--pw', sz[0] + 'px'); phone.style.setProperty('--ph', sz[1] + 'px'); document.querySelectorAll('[data-w]').forEach(x => x.setAttribute('aria-pressed', x === w)); show(cur, true); }
+});
+document.addEventListener('keydown', e => { const t = e.target.closest && e.target.closest('.thumb'); if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.click(); } });
+// ?only=1&s=장면 은 장면, ?only=1&r=경로 는 실제 이동(검사·영상용)
+document.fonts.ready.then(() => P.get('r') ? paint(P.get('r')) : show(SCENES.some(s => s[0] === P.get('s')) ? P.get('s') : 'home'));
+</script>
+</body>
+</html>

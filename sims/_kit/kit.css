@@ -1,11 +1,11 @@
-/* 시뮬레이션 공통 스타일. 색과 글꼴은 design/o/landing.html(오픽 토큰)과 같다 */
+/* 시뮬레이션 공통 스타일. 색과 글꼴은 오픽 토큰, 앱 안(.sim-embed) 겉모양은 design/v2/spec/05-sim.md 7절 */
 :root {
-  --bg: #FFFFFF; --canvas: #F2F3F5; --line: #EAEBEE;
-  --ink: #202020; --ink-2: #5C5F66; --mute: #8B95A1; --chev: #A3A8B0;
+  --bg: #FFFFFF; --canvas: #F2F4F6; --line: #E5E8EB;
+  --ink: #191F28; --ink-2: #5C5F66; --mute: #8B95A1; --chev: #A3A8B0;
   --blue: #6194F8; --accent-text: #0E5CF4; --cta: #03257B; --blue-50: #e8f3ff;
   --grey-100: #f2f4f6; --grey-200: #e5e8eb; --grey-700: #4e5968; --grey-800: #333d4b; --grey-900: #191f28;
   --orange-100: #ffe0b0;
-  --red: #C62828; --red-50: #FDECEC; /* 충돌, 잘못된 입력 표시에만 쓴다 */
+  --red: #D22030; --red-50: #FFEEEE; --conf: #F04452; /* 충돌, 잘못된 입력 표시에만 쓴다 */
   font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   color: var(--ink);
   color-scheme: light;
@@ -75,9 +75,13 @@ button { cursor: pointer; }
 .sim-btn { flex: none; height: 48px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--cta); color: #fff; font-size: 15px; font-weight: 700; }
 .sim-btn.ghost { background: var(--grey-100); color: var(--grey-800); }
 
-/* 그림 안에서 같이 쓰는 표시: 방금 들어온 것 */
-.sim-pop { animation: sim-pop .35s ease-out; }
-@keyframes sim-pop { from { transform: scale(.88); opacity: .3; } }
+/* 입력 오류: 오류 글은 입력 칸 줄 바로 아래(kit.js 가 옮김), 틀린 칸은 테두리 2px(테두리 + 안쪽 그림자라 칸 크기 그대로) */
+.sim-try [role=alert] { margin-top: 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--red); }
+.sim-try [aria-invalid=true] { border-color: var(--conf); box-shadow: inset 0 0 0 1px var(--conf); }
+
+/* 그림 안에서 같이 쓰는 표시: 방금 들어온 것 (opacity + 아래 4 에서 올라옴, 240ms) */
+.sim-pop { animation: sim-pop .24s cubic-bezier(.22,1,.36,1) both; }
+@keyframes sim-pop { from { transform: translateY(4px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
 /* 아이콘: Tabler chevron-left, TDS chevron/star (design/o와 같은 모양) */
@@ -85,4 +89,27 @@ button { cursor: pointer; }
   --i-back: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M15 6l-6 6l6 6'/></svg>");
   --i-chev: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='m5.75 13.4c-.23 0-.46-.09-.64-.26a.9.9 0 0 1 0-1.27l3.87-3.87-3.87-3.86a.9.9 0 0 1 0-1.27.9.9 0 0 1 1.27 0l4.5 4.5a.9.9 0 0 1 0 1.27l-4.5 4.5c-.17.17-.4.26-.63.26'/></svg>");
   --i-star: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='m13.154 1.927 2.327 4.715c.187.379.549.642.968.703l5.203.756c1.054.153 1.476 1.45.712 2.193l-3.765 3.67a1.287 1.287 0 0 0 -.37 1.138l.889 5.182c.18 1.051-.922 1.851-1.865 1.356l-4.654-2.447a1.284 1.284 0 0 0 -1.196 0l-4.654 2.447c-.944.495-2.046-.305-1.866-1.356l.889-5.182a1.288 1.288 0 0 0 -.37-1.138l-3.765-3.67c-.763-.743-.342-2.04.713-2.193l5.202-.756c.419-.061.782-.324.969-.703l2.326-4.715c.472-.956 1.835-.956 2.307 0'/></svg>");
+}
+
+/* 앱 안(?embed=1): 머리, 관련 질문, 설명, 조작, 모드 탭은 앱이 그린다. 무대는 --stage 판, 직접 해 보기는 --band 판 */
+.sim-embed .sim-top, .sim-embed .sim-q, .sim-embed .sim-say, .sim-embed .sim-ctrl, .sim-embed .sim-tabs { display: none !important; }
+.sim-embed, .sim-embed body { background: transparent; }
+.sim-embed .sim-page { min-height: 0; padding: 0; margin: 0; max-width: none; background: transparent; }
+.sim-embed .sim-card { margin: 0; padding: 16px; border-radius: 24px; background: #EAF1FE; }
+.sim-embed .sim-try { margin: 16px 0 0; padding: 20px; border-radius: 16px; background: var(--canvas); }
+.sim-embed .sim-try h2 { font-size: 19px; line-height: 28px; font-weight: 650; color: var(--ink); }
+.sim-embed .sim-try p:not([role=alert]) { font-size: 15px; line-height: 22px; color: var(--grey-700); }
+.sim-embed .sim-row input, .sim-embed .sim-row select { height: 52px; }
+.sim-embed .sim-btn { height: 52px; border-radius: 14px; background: var(--bg); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(0,27,55,.1); }
+.sim-embed .sim-btn.ghost { background: transparent; box-shadow: none; }
+/* tcp-handshake 새 메시지: 화살이 보내는 쪽에서 자라고 이름표가 따라 들어온다 (05 6절) */
+@media (prefers-reduced-motion: no-preference) {
+  .sim-embed .wire .msg.cur .ar { animation: kit-ar .24s cubic-bezier(.22,1,.36,1) both; }
+  .sim-embed .wire .msg.r.cur .ar { transform-origin: 0 50%; }
+  .sim-embed .wire .msg.l.cur .ar { transform-origin: 100% 50%; }
+  .sim-embed .wire .msg.r.cur .lbl { animation: kit-r .24s cubic-bezier(.22,1,.36,1) both; }
+  .sim-embed .wire .msg.l.cur .lbl { animation: kit-l .24s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes kit-ar { from { transform: scaleX(0); } }
+  @keyframes kit-r { from { transform: translateX(-48px); opacity: 0; } }
+  @keyframes kit-l { from { transform: translateX(48px); opacity: 0; } }
 }

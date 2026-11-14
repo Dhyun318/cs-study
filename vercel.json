@@ -1,6 +1,7 @@
 {
-  "buildCommand": "python3 scripts/build.py",
-  "outputDirectory": "app",
+  "buildCommand": "python3 scripts/assemble_site.py",
+  "outputDirectory": "dist",
   "installCommand": "",
-  "framework": null
+  "framework": null,
+  "redirects": [{ "source": "/app", "destination": "/app/", "permanent": true }]
 }

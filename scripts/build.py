@@ -1,14 +1,15 @@
-# 배포 폴더 app/ 의 생성물을 다시 만든다: app/data/notes.json, app/sims/(사본), app/illustrations/(사본).
-# app/ 의 손으로 쓴 파일(index.html, app.css, app.js, 아이콘, manifest)은 건드리지 않는다.
+# 배포 폴더 app/ 의 생성물을 다시 만든다: app/data/notes.json, app/data/precache.json, app/sims/(사본), app/illustrations/(사본).
+# app/ 의 손으로 쓴 파일(index.html, app.css, app.js, 아이콘, manifest)은 건드리지 않는다. 예외: app/sw.js 의 VERSION 한 줄만 빌드마다 바꾼다.
 # 책 원문(content/), PDF, 책 그림은 읽지도 복사하지도 않는다(CLAUDE.md 저작권, 2026-11-14 버셀 공개 배포 결정).
 # 실행: python3 scripts/build.py  (어디서 실행해도 된다, 표준 라이브러리만)
-# design/p-flow/make-data.py 를 앱용으로 옮긴 것: 그림 주소, [[sim:id]] 아래 "동작으로 보기" 링크, JSON 출력만 다르다.
-import json, re, shutil
+# 본문 도식은 자리 표시(<figure class="fig" data-fig data-sim>)로 두고 앱(app.js)이 그린다. 시안 design/v2/make-data.py 와 같은 방식.
+import hashlib, json, re, shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app"
-ILL = ROOT / "illustrations/a"
+ILL = ROOT / "illustrations/a"  # 본문 도식 SVG 31장 + 포스터 자리(posters.json, scripts/posters.py 가 만듦)
+ILL2 = ROOT / "illustrations/v2"  # 화면 일러스트 PNG 12장(장면 5, 기호 4, 상태 3)
 
 # 과목 파일과 질문 id (책 순서, 과목별 12/10/9/9). 시뮬레이션의 data-q 는 content 파일 이름/순번이라 그 이름도 둔다
 SUBJECTS = [
@@ -32,7 +33,7 @@ SIM_Q = {
     "cookie-session": ["net-cookie", "net-cookie-login"],
 }
 SIM_OF = {"hash-storage": "hash-table", "hash-collision": "hash-table"}  # 그림 id → 시뮬레이션 id
-PLAY = '<svg class="ti" width="20" height="20" aria-hidden="true"><use href="#t-player-play"/></svg>'
+FIG_OF = {"hash-table": "hash-collision"}  # 시뮬레이션 id → 포스터로 쓸 도식 (나머지는 같은 id)
 
 
 def esc(s):
@@ -46,12 +47,15 @@ def inline(s):
     return re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", s)
 
 
-def ill(name):
-    # 일러스트 <img>: svg 의 크기와 <title> 을 읽어 자리를 미리 잡고 대체 글로 쓴다
-    svg = (ILL / f"{name}.svg").read_text()
-    w, h = re.search(r'width="(\d+)" height="(\d+)"', svg).groups()
-    t = re.search(r"<title[^>]*>([^<]+)</title>", svg)
-    return f'<img src="illustrations/{name}.svg" alt="{esc(t.group(1) if t else "개념 그림")}" width="{w}" height="{h}" loading="lazy">'
+def figs():
+    # 도식마다 높이(폭은 모두 390)와 화면 읽기 이름(<title>)
+    out = {}
+    for p in sorted(ILL.glob("*.svg")):
+        svg = p.read_text()
+        assert re.search(r'width="390"', svg), p.name
+        t = re.search(r"<title[^>]*>([^<]+)</title>", svg)
+        out[p.stem] = {"h": int(re.search(r'height="(\d+)"', svg).group(1)), "alt": t.group(1) if t else "개념 그림"}
+    return out
 
 
 def convert(lines):
@@ -72,7 +76,8 @@ def convert(lines):
             name = m.group(1)
             sid = SIM_OF.get(name, name)
             assert (ROOT / "sims" / sid / "index.html").exists(), sid
-            out.append(f'<figure class="ill">{ill(name)}<a class="ill-go" href="#/sim/{sid}">{PLAY}동작으로 보기</a></figure>')
+            assert (ILL / f"{name}.svg").exists(), name
+            out.append(f'<figure class="fig" data-fig="{name}" data-sim="{sid}"></figure>')
             i += 1
         elif s.startswith(">"):
             j = i
@@ -189,10 +194,12 @@ def notes_json():
     titles["hash-table"] = "Hash 저장과 충돌"
     assert set(titles) == set(SIM_Q)
     qs = {q["id"]: q for q in questions}
-    sims = [{"id": sid, "s": qs[qids[0]]["s"], "title": titles[sid], "qs": qids} for sid, qids in SIM_Q.items()]
+    posters = json.loads((ILL / "posters.json").read_text())
+    sims = [{"id": sid, "s": qs[qids[0]]["s"], "title": titles[sid], "qs": qids, "fig": FIG_OF.get(sid, sid), "poster": posters[FIG_OF.get(sid, sid)]}
+            for sid, qids in SIM_Q.items()]
     for q in questions:
         q["sims"] = [s["id"] for s in sims if q["id"] in s["qs"]]
-    return {"subjects": subjects, "questions": questions, "sims": sims}
+    return {"subjects": subjects, "questions": questions, "sims": sims, "figs": figs()}
 
 
 def copy_sims():
@@ -217,14 +224,33 @@ def copy_sims():
     assert used <= set(qid), used - set(qid)
 
 
+def offline():
+    # 서비스 워커(app/sw.js, 손으로 쓴 것)가 설치 때 받을 목록: 시뮬레이션과 그림 전부(sw.js 기준 상대 경로). 글꼴은 처음 쓸 때 캐시된다
+    files = sorted(str(p.relative_to(APP)) for d in ("sims", "illustrations") for p in (APP / d).rglob("*") if p.is_file() and not p.name.startswith("."))
+    (APP / "data/precache.json").write_text(json.dumps(files, separators=(",", ":")))
+    # VERSION: 앱 파일, 본문, 사본 내용의 해시 앞 8자. 내용이 바뀌면 옛 캐시가 지워진다
+    h = hashlib.sha256()
+    icons = sorted(str(p.relative_to(APP)) for p in (APP / "icons").iterdir() if p.is_file())
+    for f in ["index.html", "app.css", "app.js", "manifest.webmanifest", "data/notes.json"] + icons + files:
+        h.update((APP / f).read_bytes())
+    sw = APP / "sw.js"
+    js, n = re.subn(r"^const VERSION = '[^']*';", f"const VERSION = '{h.hexdigest()[:8]}';", sw.read_text(), count=1, flags=re.M)
+    assert n == 1, "app/sw.js 의 const VERSION 줄이 바뀌었다. build.py 를 맞춘다"
+    sw.write_text(js)
+    return len(files)
+
+
 def main():
     for d in ("data", "sims", "illustrations"):
         shutil.rmtree(APP / d, ignore_errors=True)
     (APP / "data").mkdir(parents=True)
     data = notes_json()
     (APP / "data/notes.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
-    shutil.copytree(ILL, APP / "illustrations", ignore=shutil.ignore_patterns("*.png", ".*"))
+    shutil.copytree(ILL, APP / "illustrations", ignore=shutil.ignore_patterns("*.png", "*.json", ".*"))
+    for f in sorted(ILL2.glob("*.png")):
+        shutil.copy(f, APP / "illustrations" / f.name)
     copy_sims()
+    offline()
     q = data["questions"]
     print(len(q), "questions,", sum(len(x["tails"]) for x in q), "tails,", len(data["sims"]), "sims,",
           (APP / "data/notes.json").stat().st_size, "bytes notes.json")
