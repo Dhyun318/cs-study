@@ -1,6 +1,6 @@
 # 장면 녹화 3개 -> design/landing/motion/*.mp4
 # 실행: 프로젝트 루트에서 python3 -m http.server 8791 --bind 127.0.0.1 을 띄운 뒤 python3 design/landing/motion/record.py [영상 이름 ...]  (ffmpeg 필요, 이름이 없으면 둘 다)
-# auto-390: 좁은 화면 한 화면 자동 재생을 손대지 않고 15초 (390 x 844)
+# auto-390: 좁은 화면 한 화면 자동 재생을 손대지 않고 15초 (390 x 844, 스플래시는 splash-390 에서 따로 보므로 건너뜀)
 # scroll-1440: 탑 쌓기 → 시뮬레이션 단계 → 헷갈림만 거르기 스크롤 10초 (1440 x 900)
 # splash-390: 휴대폰 첫 방문 스플래시(사진 6컷 → 마크 → 본 화면)를 열자마자부터 3초 (390 x 844, 새 세션)
 import pathlib, subprocess, sys, time
@@ -30,6 +30,7 @@ with sync_playwright() as pw:
     for name, (w, h), act, sec, from_open in CLIPS:
         if PICK and name not in PICK: continue
         ctx = b.new_context(viewport={'width': w, 'height': h}, record_video_dir=str(OUT / 'raw'), record_video_size={'width': w, 'height': h})
+        if name == 'auto-390': ctx.add_init_script("sessionStorage.setItem('cs-sp', '1')")
         t0 = time.time(); pg = ctx.new_page()
         opened = time.time() - t0
         pg.goto(URL); pg.evaluate('document.fonts.ready')
