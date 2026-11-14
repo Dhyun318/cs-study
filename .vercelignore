@@ -1,13 +1,24 @@
 # 버셀은 scripts/assemble_site.py 로 dist/ 를 만든다(랜딩 + app/). 빌드에 필요 없는 것은 올리지 않는다
 _reference/
-# design/ 중 랜딩과 랜딩이 쓰는 그림만 남긴다
-design/*
-!design/landing/
-!design/v2/
-design/v2/*
-!design/v2/illustrations/
+# design/ 중 랜딩(design/landing/index.html)과 랜딩이 쓰는 그림(design/v2/illustrations)만 올린다
+design/p-flow/
+design/landing-3d/
+design/references*
+design/CLAUDE.md
 design/landing/shots/
 design/landing/motion/
+design/landing/*.py
+design/landing/CLAUDE.md
+design/v2/shots/
+design/v2/motion/
+design/v2/review/
+design/v2/spec/
+design/v2/fig/
+design/v2/brand/
+design/v2/*.html
+design/v2/*.js
+design/v2/*.py
+design/v2/*.md
 # docs/ 중 시뮬레이션 제목 표(simulations.md)는 build.py 가 읽는다
 docs/*
 !docs/simulations.md
