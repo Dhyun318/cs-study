@@ -883,7 +883,7 @@ function watchSw(reg) {
   if (w) w.addEventListener('statechange', () => { if (w.state === 'redundant' && !reg.active) setOff('fail'); });
   navigator.serviceWorker.ready.then(() => {
     setOff('saved');
-    if (S && !S.seen.offlineDone) { S.seen.offlineDone = 1; save(); toast('이제 인터넷 없이도 볼 수 있어요'); }
+    if (S && !S.seen.offlineDone) { S.seen.offlineDone = 1; save(); }
   });
 }
 // 새 판이 자리를 넘겨받으면(새 서비스 워커) 새로 고침을 권한다. 처음 설치는 빼고

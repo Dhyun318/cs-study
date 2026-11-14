@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<!-- 공부 기록이 있으면 바로 앱으로 (시안에서는 ?stay=1 이면 넘기지 않음) -->
-<script>try{var s=JSON.parse(localStorage.getItem('cs-chagok'));if(s&&(s.last||(s.read||[]).length||(s.conf||s.confused||[]).length)&&!/[?&]stay=1/.test(location.search))location.replace('./app/')}catch(e){}document.documentElement.className='js'</script>
+<!-- 공부 기록이 있으면 시작하기 버튼을 이어서 공부하기로 바꾼다(자동 이동은 하지 않음, 2026-11-14 결정) -->
+<script>document.documentElement.className='js';try{var s=JSON.parse(localStorage.getItem('cs-chagok'));if(s&&(s.last||(s.read||[]).length||(s.conf||s.confused||[]).length))document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('a.btn.pri[href="./app/"]').forEach(function(a){a.textContent='이어서 공부하기'})})}catch(e){}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CS 차곡 | CS 전공 개념을 휴대폰에서 차곡차곡</title>
 <meta name="description" content="CS 전공 40문항을 해설과 시뮬레이션으로 공부해요">

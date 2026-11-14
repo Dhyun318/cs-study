@@ -1,5 +1,5 @@
 // 오프라인 지원 서비스 워커. 모든 경로는 이 파일 위치 기준 상대 경로.
-const VERSION = 'b832c06d'; // 배포 때 올리면 옛 캐시가 지워진다
+const VERSION = 'd2043364'; // 배포 때 올리면 옛 캐시가 지워진다
 const CACHE = 'cs-chagok-' + VERSION;
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'data/notes.json',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
