@@ -27,10 +27,10 @@ def move(m):
     return f"{m[1]}./assets/{src.name}"
 
 
-# 랜딩 사진(design/landing/photos/*.webp)을 같은 상대 경로로 복사한다
-(DIST / "photos").mkdir()
-for f in (LANDING / "photos").glob("*.webp"):
-    shutil.copy(f, DIST / "photos" / f.name)
+# 랜딩 사진(design/landing/photos/*.webp, 스플래시용 줄인 사본 photos/sp/*.webp)을 같은 상대 경로로 복사한다
+(DIST / "photos" / "sp").mkdir(parents=True)
+for f in [*LANDING.glob("photos/*.webp"), *LANDING.glob("photos/sp/*.webp")]:
+    shutil.copy(f, DIST / f.relative_to(LANDING))
 
 (DIST / "index.html").write_text(re.sub(r"""(["'(])(\.\./[^"')]+)""", move, html), encoding="utf-8")
 print(f"dist/ 완성: {sum(1 for p in DIST.rglob('*') if p.is_file())}개 파일")

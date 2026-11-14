@@ -13,7 +13,13 @@ try{if(matchMedia('(max-width: 959.98px) and (prefers-reduced-motion: no-prefere
 <link rel="icon" href="../v2/brand/favicon.svg" type="image/svg+xml">
 <meta property="og:title" content="CS 차곡">
 <meta property="og:description" content="CS 전공 40문항을 해설과 시뮬레이션으로 공부해요">
-<meta property="og:image" content="../v2/brand/og.png">
+<!-- 공유 미리보기: 카카오톡 등은 상대 경로를 못 읽어서 절대 주소로(배포 스크립트의 ../ 바꾸기에도 안 걸림) -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://cs-study-sooty.vercel.app/">
+<meta property="og:image" content="https://cs-study-sooty.vercel.app/app/icons/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
 /* 토큰: design/v2/spec/00-system.md 3절, 9절 그대로. 랜딩 등장 시간만 references-rea.md 4절(dur-enter, dur-hero) */
@@ -86,8 +92,15 @@ a.lp-brand:active { transform: scale(.97); opacity: .7; }
 @keyframes lpIn { from { opacity: 0; transform: translateY(16px); } }
 
 .lp-pin { display: flex; flex-direction: column; align-items: center; }
-/* 좁은 화면 장면 점과 지금 장면 한 줄 */
-.lp-dots { display: flex; justify-content: center; margin-top: 8px; }
+/* 좁은 화면 장면 점과 지금 장면 한 줄. 멈춤 버튼은 점 줄 오른쪽(점은 가운데 그대로) */
+.lp-ctl { position: relative; align-self: stretch; margin-top: 8px; }
+.lp-dots { display: flex; justify-content: center; }
+.lp-pause { position: absolute; top: 0; left: calc(50% + 114px); width: 44px; height: 44px; display: grid; place-items: center; border-radius: 22px; color: var(--ink-3); transition: transform var(--micro) var(--prs), background-color var(--micro) var(--std); }
+.lp-pause:active { transform: scale(.85); background-color: var(--band); }
+.lp-pause .on, .lp-pause[aria-pressed="true"] .off { display: none; }
+.lp-pause[aria-pressed="true"] .on { display: block; }
+/* 폭 316 미만(사파리 글자 확대 125% 이상 등): 점 오른쪽 자리에 멈춤 버튼이 안 들어가 점과 한 줄로 가운데(UX 2회차) */
+@media (max-width: 315.98px) { .lp-ctl { display: flex; justify-content: center; } .lp-pause { position: static; } }
 .lp-dots button { width: 44px; height: 44px; display: grid; place-items: center; transition: transform var(--micro) var(--prs); }
 .lp-dots button::before { content: ""; width: 8px; height: 8px; border-radius: 4px; background: var(--ink-off); transition: width var(--base) var(--out), background-color var(--base) var(--std); }
 .lp-dots button:active { transform: scale(.85); }
@@ -95,31 +108,128 @@ a.lp-brand:active { transform: scale(.97); opacity: .7; }
 .lp-cap { min-height: 26px; margin-top: 4px; font-size: 16px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; text-align: center; text-wrap: balance; }
 .lp-cap.swap { animation: rise var(--base) var(--out) both; }
 .lp-steps { list-style: none; margin: 0; padding: 0; }
+.lp-steps-h { display: none; }
 
 .lp-sec { padding: 72px 20px; }
 .lp-wrap { max-width: 1120px; margin: 0 auto; }
-.lp-h2 { font-size: 26px; line-height: 34px; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; }
+.lp-h2 { font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; }
 .lp-lead { margin-top: 12px; max-width: 30em; font-size: 17px; line-height: 28px; color: var(--ink-2); text-wrap: pretty; }
 .lp-subj { display: none; background: var(--band); }
-.lp-subj ul { list-style: none; padding: 0; margin-top: 56px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px 80px; }
-.lp-subj li { display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 16px; }
+.lp-subj .subs { list-style: none; padding: 0; margin-top: 56px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px 80px; }
+.lp-subj .subs > li { display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 16px; }
 .lp-subj img { width: 48px; height: 48px; }
 .lp-subj h3 { font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em; }
-.lp-subj .meta { margin-top: 2px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink-3); }
+.lp-subj .meta { margin-top: 2px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink-2); } /* 연회색 바탕이라 ink-3 은 4.19:1 */
 .lp-subj .tp { margin-top: 8px; font-size: 15px; line-height: 24px; color: var(--ink-2); }
-.lp-subj .brow { margin-top: 16px; grid-column: 2; }
-.lp-end { text-align: center; }
+/* 과목 섹션 머리 숫자(실제 수치만): 아래 과목 내역이 이 숫자를 풀어 보여 준다. 선으로 과목 목록과 나눈다 */
+.lp-subj .nums { list-style: none; margin-top: 32px; padding: 0 0 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 16px; box-shadow: inset 0 -1px 0 var(--line); }
+.lp-subj .nums .v { font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.lp-subj .nums .v b { margin-right: 2px; font-size: 32px; line-height: 40px; color: var(--accent-text); letter-spacing: -0.03em; }
+.lp-subj .nums .k { margin-top: 4px; font-size: 15px; line-height: 22px; color: var(--ink-2); text-wrap: balance; }
+/* 실제 질문 제목(notes 의 title 그대로): 누르면 앱의 그 질문(./app/#/q/<id>). 앱 줄처럼 화살표와 누름 반응 */
+.lp-subj .qs { list-style: none; margin-top: 12px; padding: 0; border-radius: 16px; background: var(--bg); box-shadow: var(--hair); overflow: hidden; }
+.lp-subj .qs a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 12px 16px; font-size: 15px; line-height: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); text-wrap: pretty; transition: background-color var(--micro) var(--std); }
+.lp-subj .qs li + li a { box-shadow: inset 0 1px 0 var(--line); }
+.lp-subj .qs a .ic { color: var(--ink-3); }
+.lp-subj .qs a:focus-visible { outline-offset: -2px; } /* 카드가 모서리를 잘라서 안쪽에 */
+@media (hover: hover) { .lp-subj .qs a:hover { background-color: var(--band); } }
+.lp-subj .qs a:active { background-color: var(--line); }
+.lp-subj .more { margin-top: 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink-2); }
 .lp-foot { padding: 24px 20px 32px; box-shadow: inset 0 1px 0 var(--line); }
 .lp-foot .lp-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; color: var(--ink-3); }
 .lp-foot .lp-brand { color: var(--ink); min-height: 0; }
 .lp-foot .lp-brand .mark { width: 24px; height: 24px; }
 
-/* ===== 좁은 화면(959 이하): 스크롤 없는 한 화면. 제목, 한 줄 설명, 시작하기, 폰(장면 자동 재생), 장면 점, 지금 장면 한 줄.
-   폰 크기는 fit() 이 남은 높이에 맞춘다(글자·버튼은 그대로). 설명 걸음, 끝 섹션, 바닥글은 넓은 화면 전용 ===== */
+/* 기능 조각: 연회색 판 안에 앱 화면 일부(390 폭 그대로 그려 --fz 배로 줄임), 아래는 판 끝에서 잘린다. 휴대폰 전용(컴퓨터는 붙은 폰이 보여 줌) */
+.lp-frag { margin-top: 24px; padding: 24px 20px 0; border-radius: 24px; background: var(--band); overflow: hidden; -webkit-user-select: none; user-select: none; }
+.lp-frag .fs { width: 390px; margin: 0 auto; zoom: var(--fz, .8); padding: 20px 0 28px; border-radius: 24px 24px 0 0; background: var(--bg); box-shadow: var(--shadow-s); }
+.lp-frag .qt { margin-top: 8px; }
+.lp-frag .recall { height: auto; margin: 24px 20px 0; }
+/* 걸음 1 조각: 답 보기 카드를 누르면 그 자리에서 답 첫 단락이 열린다(문구가 누르라고 한 버튼) */
+.lp-frag button.recall { width: calc(100% - 40px); text-align: center; transition: background-color var(--micro) var(--std); }
+.lp-frag button.recall .mid > span { display: block; }
+.lp-frag button.recall .mid > span + span { margin-top: 4px; text-wrap: balance; }
+.lp-frag button.recall:active { background-color: var(--line); }
+.lp-frag button.recall:active .btn { transform: scale(.97); filter: brightness(.92); }
+.lp-frag .ans:focus { outline: none; }
+.lp-frag .hero, .lp-frag .towers, .lp-frag .confsum { margin: 0 20px; }
+.lp-frag .towers { margin-top: 0; }
+.lp-frag .stg { margin: 0 20px; }
+.lp-frag .simcap { margin: 16px 20px 0; }
+.lp-frag .simcap p { margin-top: 8px; }
+.lp-frag .segbar { padding-top: 0; }
+.lp-frag .confsum { padding: 16px 0 8px; }
+/* 스크롤로 들어올 때 한 번 올라온다(그림만, 글과 버튼은 그대로) */
+.js .rv { transition: opacity var(--enter) var(--out), transform var(--enter) var(--out); }
+.js .rv:not(.shown) { opacity: 0; transform: translateY(24px); }
+
+/* 자주 묻는 질문: 버튼 aria-expanded 가 답 칸을 연다 */
+.lp-faq .list { margin-top: 24px; }
+.qa + .qa { box-shadow: inset 0 1px 0 var(--line); }
+.qa h3 { margin: 0; }
+.qa button { width: calc(100% + 24px); min-height: 64px; margin: 0 -12px; padding: 16px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-radius: 12px; text-align: left; font-size: 17px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; transition: background-color var(--micro) var(--std); }
+@media (hover: hover) { .qa button:hover { background-color: var(--band); } }
+.qa button:active { background-color: var(--line); } /* 누름은 올려 둠(hover)보다 한 단계 진하게 */
+.qa button .ic { color: var(--ink-3); transition: transform var(--base) var(--out); }
+.qa [aria-expanded="true"] .ic { transform: rotate(180deg); }
+.qa .fa { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows var(--base) var(--out), visibility 0s var(--base); }
+.qa:has([aria-expanded="true"]) .fa { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows var(--base) var(--out); }
+.qa .fa > div { overflow: hidden; }
+.qa .fa p { padding: 0 0 20px; max-width: 34em; font-size: 16px; line-height: 26px; color: var(--ink-2); text-wrap: pretty; }
+
+/* 컴퓨터 첫 화면: 시작하기 아래 휴대폰으로 열기 QR(앱 주소, segno 로 미리 만든 정적 SVG) */
+.lp-qr { display: none; }
+
+/* 끝: 사진 한 장 + 제목 + 시작하기 */
+.lp-end img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; object-position: 50% 40%; border-radius: 24px; background: var(--band); }
+
+/* 하단 고정 시작하기(휴대폰): 첫 시작하기가 화면 밖이고 끝 시작하기가 안 보일 때만.
+   바탕은 밑에 깔린 섹션 색: 회색 과목 섹션 위에서는 회색(.gray, 흰 판으로 끊기던 것, 디자인 2회차) */
+.lp-dock { --dk: 255,255,255; position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; padding: 16px 20px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(rgba(var(--dk),0), rgb(var(--dk)) 16px); visibility: hidden; transform: translateY(100%); transition: transform var(--base) var(--std), visibility 0s var(--base); }
+.lp-dock.on { visibility: visible; transform: none; transition: transform var(--enter) var(--out); }
+.lp-dock.gray { --dk: 242,244,246; } /* = --band (.band 는 폰 안 회색 띠 이름이라 따로) */
+
+/* ===== 좁은 화면(959 이하): 첫 화면은 스크롤 없이 한 화면(제목, 한 줄 설명, 시작하기, 폰 장면 자동 재생, 점, 지금 장면 한 줄).
+   폰 크기는 fit() 이 남은 높이에 맞춘다. 그 아래로 기능 5개(묶음 제목), 과목(숫자 머리), 질문, 끝, 바닥글이 이어진다 ===== */
 @media (max-width: 959.98px) {
+  html { scroll-padding-bottom: 96px; }
   .lp-pin { padding-top: 12px; }
-  .lp-steps, .lp-end, .lp-foot { display: none; }
+  .lp-nav .btn { display: none; } /* 휴대폰은 하단 고정 시작하기가 맡는다 */
+  /* 기능 묶음 제목: 첫 화면 끝 한 줄과 같은 걸음 제목이 바로 이어져도 새 묶음의 시작으로 읽힌다(2회차 두 평가) */
+  .lp-steps-h { display: block; padding: 72px 20px 0; }
+  .lp-steps { padding: 32px 20px 0; }
+  .lp-step + .lp-step { margin-top: 72px; }
+  .lp-step .in h3 { font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; }
+  .lp-step .in p { margin-top: 8px; font-size: 17px; line-height: 28px; color: var(--ink-2); text-wrap: pretty; }
+  .lp-subj { display: block; }
+  .lp-subj .subs { margin-top: 32px; grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .lp-end img { margin-bottom: 32px; }
+  .lp-end .btn { margin-top: 24px; }
+  .lp-foot { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+  /* 첫 화면 폰을 누르면 다음 장면(점과 같은 동작) */
+  .lp-device { cursor: pointer; transition: transform var(--micro) var(--prs); }
+  .lp-device:active { transform: scale(.98); }
+  /* 폰을 최소 크기로 지키느라 아래가 모자라면 판 끝처럼 잘라 흐리게 */
+  .lp-device.cut { overflow: hidden; -webkit-mask-image: linear-gradient(#000 85%, transparent); mask-image: linear-gradient(#000 85%, transparent); }
 }
+.lp-sub .s-short { display: none; }
+.lp-sub .nw { white-space: nowrap; }
+.br-d, .br-xs { display: none; }
+/* 폭 340 이하: 짧은 한 줄의 두 번째 가운데점을 빼고 줄을 바꿔 둘째 줄이 가입 없이 무료로 시작(줄 첫머리 가운데점 없음) */
+@media (max-width: 340px) { .lp-sub .sep2 { display: none; } .br-xs { display: inline; } }
+/* 낮은 휴대폰 화면(주소창 뺀 높이 760 이하): 제목, 설명, 여백을 줄이고 설명은 짧은 한 줄로, 남는 높이는 폰에 */
+@media (max-width: 959.98px) and (max-height: 760px) {
+  :root { --navh: 48px; }
+  .lp-intro { padding-top: 8px; }
+  .lp-h1 { font-size: 26px; line-height: 34px; }
+  .lp-sub { margin-top: 6px; font-size: 15px; line-height: 22px; }
+  .lp-sub .s-long { display: none; }
+  .lp-sub .s-short { display: inline; }
+  .lp-intro .btn { margin-top: 14px; min-height: 52px; }
+  .lp-pin { padding-top: 4px; }
+  .lp-ctl, .lp-cap { margin-top: 0; }
+}
+@media (min-width: 960px) { .lp-frag, .lp-dock { display: none; } }
 
 /* 폰: 390 x 844 앱 화면을 그대로 그리고 통째로 줄인다 */
 .lp-device { --s: .5; width: calc(410px * var(--s)); height: calc(864px * var(--s)); flex: none; }
@@ -131,23 +241,38 @@ a.lp-brand:active { transform: scale(.97); opacity: .7; }
   :root { --navh: 64px; }
   .lp-nav .in { padding: 0 40px; }
   .lp-story { max-width: 1200px; margin: 0 auto; padding: 0 40px; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 80px; }
-  .lp-intro { grid-column: 1; grid-row: 1; min-height: calc(100vh - var(--navh)); min-height: calc(100svh - var(--navh)); display: flex; flex-direction: column; align-items: flex-start; padding: 96px 0; }
+  .lp-intro { grid-column: 1; grid-row: 1; min-height: calc(100vh - var(--navh)); min-height: calc(100svh - var(--navh)); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 96px 0; }
+  .lp-qr { display: flex; align-items: center; gap: 16px; margin-top: 32px; }
+  .lp-qr svg { width: 96px; height: 96px; flex: none; border-radius: 8px; box-shadow: var(--hair); shape-rendering: crispEdges; }
+  .lp-qr b { display: block; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--ink); }
+  .lp-qr > span > span { display: block; margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--ink-2); }
   .lp-sub { margin-top: 24px; font-size: 20px; line-height: 32px; }
+  .br-d { display: inline; } /* 컴퓨터는 두 문장을 두 줄로 */
   .lp-intro .btn { width: auto; margin-top: 40px; padding: 0 32px; }
   .lp-pin { position: sticky; top: var(--navh); grid-column: 2; grid-row: 1 / 3; align-self: start; height: calc(100vh - var(--navh)); height: calc(100svh - var(--navh)); justify-content: center; padding: 0; }
-  .lp-dots, .lp-cap { display: none; }
+  .lp-ctl, .lp-cap { display: none; }
   .lp-steps { display: block; grid-column: 1; grid-row: 2; padding-bottom: 20vh; } /* 마지막 걸음이 가운데 와도 폰이 붙어 있게 */
   .lp-step { height: 80vh; height: 80svh; display: flex; align-items: center; }
-  .lp-step .in { opacity: .28; transition: opacity var(--base) var(--std); }
-  .lp-step.on .in { opacity: 1; }
-  .lp-step h2 { font-size: 36px; line-height: 48px; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; }
-  .lp-step p { margin-top: 16px; max-width: 26em; font-size: 19px; line-height: 32px; color: var(--ink-2); text-wrap: pretty; }
+  /* 꺼진 걸음은 흐린 색(투명도 대신): 제목 3:1, 본문 4.5:1 이상 */
+  .lp-step h3 { font-size: 36px; line-height: 48px; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; color: var(--ink-off); transition: color var(--base) var(--std); }
+  .lp-step p { margin-top: 16px; max-width: 26em; font-size: 19px; line-height: 32px; color: var(--ink-3); text-wrap: pretty; transition: color var(--base) var(--std); }
+  .lp-step.on h3 { color: var(--ink); }
+  /* 묶음 제목은 화면에 안 보이게(걸음이 폰과 붙어 있어 필요 없음), 제목 순서(h2 아래 h3)만 남긴다. 절대 위치라 grid 칸을 안 차지한다 */
+  .lp-steps-h { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .lp-step.on p { color: var(--ink-2); }
   .lp-sec { padding: 120px 40px; }
   .lp-h2 { font-size: 40px; line-height: 52px; }
   .lp-lead { margin-top: 16px; font-size: 19px; line-height: 32px; }
   .lp-subj { display: block; }
-  .lp-end .lp-h2 { display: block; }
-  .lp-end .lp-lead { margin: 16px auto 0; font-size: 19px; line-height: 32px; color: var(--ink-2); }
+  .lp-subj .nums { margin-top: 48px; padding-bottom: 48px; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px; }
+  .lp-subj .nums .v { font-size: 24px; line-height: 32px; }
+  .lp-subj .nums .v b { font-size: 48px; line-height: 56px; }
+  .lp-subj .nums .k { margin-top: 8px; font-size: 17px; line-height: 26px; }
+  .lp-faq .lp-wrap { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); column-gap: 80px; align-items: start; }
+  .lp-faq .list { margin-top: 0; }
+  .lp-end { padding-top: 80px; } /* 짧은 질문 목록 뒤 빈 곳 줄이기 */
+  .lp-end .lp-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 80px; align-items: center; }
+  .lp-end img { aspect-ratio: 4 / 5; }
   .lp-end .btn { display: inline-flex; width: auto; min-width: 200px; margin-top: 32px; padding: 0 32px; }
   .lp-foot { padding: 40px; }
 }
@@ -245,9 +370,6 @@ section.sec { padding: 24px 20px 32px; } /* .btn.sec 와 이름이 겹쳐 sectio
 .tw img { width: 32px; height: 32px; margin: 12px auto 0; }
 .tw .t-caption { margin-top: 4px; white-space: nowrap; color: var(--ink); }
 .tw .t-label { margin-top: 2px; white-space: nowrap; }
-.tw .cf { margin-top: 4px; color: var(--conf-ink); }
-.revrow { margin-top: 16px; }
-.revrow .ri:first-child { color: var(--conf-ink); }
 .n1 { display: none; }
 #tw.built .stack .blk { animation: drop var(--base) var(--out) both; animation-delay: calc(var(--k) * 60ms); }
 #tw.plus .blk[data-new] { background: var(--accent); animation: pop var(--base) var(--pop) both; }
@@ -395,8 +517,8 @@ mark { color: inherit; background: linear-gradient(transparent 62%, var(--track)
 .sp-ring svg { width: 24px; height: 24px; }
 .sp-ring .a { stroke-dasharray: 56.55; animation: spArc .95s .03s both linear; }
 .sp-nm, .sp-sb { position: absolute; left: -160px; width: 320px; text-align: center; }
-.sp-nm { top: 31px; font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.03em; animation: spUp .25s 1.12s both cubic-bezier(.2,.7,.3,1); }
-.sp-sb { top: 73px; font-size: 15px; line-height: 22px; color: var(--ink-2); animation: spUp .22s 1.18s both cubic-bezier(.2,.7,.3,1); }
+.sp-nm { top: 31px; font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: -0.03em; animation: spUp .2s 1.2s both cubic-bezier(.2,.7,.3,1); }
+.sp-sb { top: 73px; font-size: 15px; line-height: 22px; color: var(--ink-2); animation: spUp .16s 1.24s both cubic-bezier(.2,.7,.3,1); }
 @keyframes spOpen { from { opacity: 0; transform: scale(.92); } }
 @keyframes spCut { from { opacity: 0; transform: scale(1.35); filter: blur(10px); } 45% { opacity: 1; } }
 @keyframes spLast { from { opacity: 0; transform: scale(1.4); filter: blur(12px); } 35% { opacity: 1; } }
@@ -411,7 +533,7 @@ mark { color: inherit; background: linear-gradient(transparent 62%, var(--track)
 /* 움직임 줄이기: 이동과 크기 변화 없이 장면은 끝 상태 그림으로 (00 9.2-8) */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; transition-delay: 0ms !important; }
-  .tap { display: none; }
+  .tap, .lp-pause { display: none; } /* 자동 재생이 없으니 멈춤 버튼도 없음 */
 }
 </style>
 </head>
@@ -435,10 +557,10 @@ mark { color: inherit; background: linear-gradient(transparent 62%, var(--track)
   if (!H.classList.contains('sp-on')) return sp.remove();
   // 사진 6컷: 기다리지 않고 바로 시작, 불러온 컷만 보인다. 없는 5·6 은 1·2 로 채운다
   const PC = ['#E5E8EB', '#EAF1FE', '#F2F4F6', '#E1EAFD', '#E5E8EB', '#EAF1FE'];
-  sp.querySelector('.sp-w').insertAdjacentHTML('afterbegin', PC.map((c, i) => `<div class="sp-ph" style="--pc:${c}"><img alt="" src="photos/photo-${i + 1}.webp"></div>`).join(''));
+  sp.querySelector('.sp-w').insertAdjacentHTML('afterbegin', PC.map((c, i) => `<div class="sp-ph" style="--pc:${c}"><img alt="" src="photos/sp/photo-${i + 1}.webp"></div>`).join(''));
   sp.querySelectorAll('img').forEach((im, i) => {
     im.onload = () => im.parentNode.classList.add('ok');
-    im.onerror = () => { im.onerror = null; if (i > 3) im.src = `photos/photo-${i - 3}.webp`; };
+    im.onerror = () => { im.onerror = null; if (i > 3) im.src = `photos/sp/photo-${i - 3}.webp`; };
   });
   // 좁고 낮은 화면(가로로 든 휴대폰 등)은 통째로 줄인다
   sp.style.setProperty('--z', Math.min(1, innerHeight / 560, innerWidth / 340).toFixed(3));
@@ -462,6 +584,7 @@ mark { color: inherit; background: linear-gradient(transparent 62%, var(--track)
   <symbol id="i-help" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 16v.01"/><path d="M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5l10 -10"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13 -8z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="M8.243 7.34l-6.38 .925l-.113 .023a1 1 0 0 0 -.44 1.684l4.622 4.499l-1.09 6.355l-.013 .11a1 1 0 0 0 1.464 .944l5.706 -3l5.693 3l.1 .046a1 1 0 0 0 1.352 -1.1l-1.091 -6.355l4.624 -4.5l.078 -.085a1 1 0 0 0 -.633 -1.62l-6.38 -.926l-2.852 -5.78a1 1 0 0 0 -1.794 0l-2.853 5.78z"/></symbol>
   <symbol id="i-desk" viewBox="0 0 24 24"><path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z"/><path d="M7 20h10"/><path d="M9 16v4"/><path d="M15 16v4"/></symbol>
   <symbol id="i-server" viewBox="0 0 24 24"><path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z"/><path d="M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z"/><path d="M7 8v.01"/><path d="M7 16v.01"/></symbol>
@@ -479,12 +602,13 @@ mark { color: inherit; background: linear-gradient(transparent 62%, var(--track)
   <div class="lp-story">
     <section class="lp-intro" aria-labelledby="h1">
       <h1 class="lp-h1" id="h1">CS 전공 개념을<br>휴대폰에서 차곡차곡</h1>
-      <p class="lp-sub">자료구조부터 네트워크까지 40문항을 짧은 해설로 읽고, 어려운 개념은 시뮬레이션으로 움직여 봐요.</p>
+      <p class="lp-sub"><span class="s-long">40문항을 짧은 해설로 읽고, 어려운 개념은 시뮬레이션으로 움직여 봐요. <br class="br-d"><span class="nw">가입 없이 무료예요.</span></span><span class="s-short">40문항 해설&nbsp;· <span class="nw">시뮬레이션 30개</span><span class="sep2">&nbsp;·</span> <br class="br-xs"><span class="nw">가입 없이 무료</span></span></p>
       <a class="btn l pri" href="./app/" data-hero-cta>시작하기</a>
+      <p class="lp-qr"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="앱 주소 QR 코드" viewBox="0 0 33 33"><rect width="33" height="33" fill="#fff"/><path stroke="#191f28" d="M2 2.5h7m3 0h4m4 0h1m1 0h1m1 0h7m-29 1h1m5 0h1m1 0h1m1 0h1m1 0h1m4 0h1m2 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h1m4 0h1m2 0h1m3 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h2m2 0h1m1 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m6 0h1m2 0h1m2 0h2m1 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m4 0h4m1 0h2m4 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-21 1h2m1 0h1m2 0h1m3 0h1m1 0h1m-21 1h1m5 0h1m1 0h2m1 0h2m2 0h1m1 0h1m2 0h3m2 0h3m-28 1h1m1 0h2m1 0h1m3 0h1m1 0h1m2 0h2m2 0h2m1 0h1m1 0h2m1 0h2m-28 1h3m2 0h2m1 0h1m2 0h2m2 0h2m3 0h1m2 0h1m-23 1h1m1 0h2m3 0h1m1 0h2m3 0h2m2 0h2m3 0h2m-25 1h1m1 0h2m1 0h2m3 0h4m1 0h1m3 0h1m1 0h1m5 0h1m-29 1h2m7 0h2m2 0h1m1 0h1m3 0h6m2 0h2m-28 1h2m1 0h1m1 0h3m1 0h1m1 0h4m1 0h2m1 0h1m2 0h4m-25 1h4m1 0h2m4 0h2m1 0h1m1 0h2m1 0h3m2 0h1m1 0h1m-28 1h2m3 0h5m3 0h4m1 0h1m5 0h2m-27 1h4m1 0h1m2 0h1m3 0h1m2 0h2m1 0h3m1 0h1m1 0h1m1 0h3m-29 1h3m1 0h3m1 0h4m1 0h4m1 0h2m2 0h1m2 0h1m2 0h1m-29 1h1m3 0h1m3 0h1m1 0h2m2 0h1m4 0h1m4 0h1m-25 1h1m1 0h3m1 0h1m2 0h1m1 0h2m2 0h3m2 0h5m1 0h3m-21 1h1m3 0h2m1 0h1m2 0h3m3 0h2m-26 1h7m3 0h1m1 0h5m2 0h2m1 0h1m1 0h3m-27 1h1m5 0h1m2 0h1m3 0h1m5 0h2m3 0h1m3 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m1 0h3m1 0h2m2 0h7m2 0h1m-29 1h1m1 0h3m1 0h1m2 0h2m2 0h1m1 0h5m1 0h1m1 0h1m1 0h2m1 0h1m-29 1h1m1 0h3m1 0h1m2 0h3m3 0h1m3 0h2m1 0h6m-28 1h1m5 0h1m2 0h1m1 0h1m1 0h3m2 0h1m4 0h1m1 0h2m1 0h1m-29 1h7m1 0h2m3 0h1m3 0h2m5 0h1m1 0h1"/></svg><span><b>휴대폰으로 열기</b><span>카메라로 찍으면 앱이 바로 열려요</span></span></p>
     </section>
 
     <div class="lp-pin">
-      <div class="lp-device" role="img" aria-label="CS 차곡 앱 화면 미리보기. 아래 설명에 맞춰 화면이 바뀌어요">
+      <div class="lp-device" role="img" aria-label="CS 차곡 앱 화면 미리보기">
         <div class="lp-frame"><div class="lp-screen" inert>
 
           <!-- 장면 0: 홈 -->
@@ -495,7 +619,7 @@ mark { color: inherit; background: linear-gradient(transparent 62%, var(--track)
             <section class="sec rnd"><div class="sh"><h2 class="t-head">랜덤 질문</h2><span class="ib"><svg class="ic"><use href="#i-shuffle"/></svg></span></div><div class="card"><div class="bd"><div class="top"><p class="t-label c-a">네트워크 · HTTP</p><span class="tag star num"><svg class="ic f"><use href="#i-star"/></svg>2</span></div><h3 class="t-row">HTTP request method 중 GET vs POST를 비교 설명해 주세요.</h3><p class="hid t-label c-3"><svg class="ic"><use href="#i-eyeoff"/></svg>답은 가려져 있어요</p></div></div></section>
             <div class="band"></div>
             <section class="sec"><div class="sh"><h2 class="t-head">과목 진도</h2><p class="sum"><span class="t-label c-3">읽음&nbsp;</span><b class="t-display c-a num">17</b><span class="t-label c-3 num">&nbsp;/ 40</span></p></div>
-              <div class="towers"><span class="tw"><span class="stack" data-b="RrrrrrrrrrCu"></span></span><span class="tw"><span class="stack" data-b="rrrriCuuuu"></span></span><span class="tw"><span class="stack" data-b="rrriuuuuu"></span></span><span class="tw"><span class="stack" data-b="uuuuuuuuu"></span></span></div>
+              <div class="towers"><span class="tw"><span class="stack" data-b="rrrrrrrrrruu"></span></span><span class="tw"><span class="stack" data-b="rrrriuuuuu"></span></span><span class="tw"><span class="stack" data-b="rrriuuuuu"></span></span><span class="tw"><span class="stack" data-b="uuuuuuuuu"></span></span></div>
             </section>
           </div>
 
@@ -532,17 +656,16 @@ COMMIT;</code></pre></div>
             <header class="hm cl"><div class="r2"><span class="t-title2 on">홈</span><span class="t-title2">목차</span><span class="t-title2">시뮬레이션</span></div></header>
             <section class="sec" style="padding-top:16px"><div class="sh"><h2 class="t-head">과목 진도</h2><p class="sum"><span class="t-label c-3">읽음&nbsp;</span><b class="t-display c-a num"><span class="n0">17</span><span class="n1">18</span></b><span class="t-label c-3 num">&nbsp;/ 40</span></p></div>
               <div class="towers">
-                <span class="tw"><span class="stack" data-b="RrrrrrrrrrCu"></span><img src="../v2/illustrations/sym-ds.png" alt="" width="32" height="32"><span class="t-caption">자료구조</span><span class="t-label c-3 num">읽음 10 / 12</span><span class="t-label cf num">헷갈림 2</span></span>
-                <span class="tw"><span class="stack" data-b="rrrriCuuuu"></span><img src="../v2/illustrations/sym-os.png" alt="" width="32" height="32"><span class="t-caption">운영체제</span><span class="t-label c-3 num">읽음 4 / 10</span><span class="t-label cf num">헷갈림 1</span></span>
+                <span class="tw"><span class="stack" data-b="rrrrrrrrrruu"></span><img src="../v2/illustrations/sym-ds.png" alt="" width="32" height="32"><span class="t-caption">자료구조</span><span class="t-label c-3 num">읽음 10 / 12</span></span>
+                <span class="tw"><span class="stack" data-b="rrrriuuuuu"></span><img src="../v2/illustrations/sym-os.png" alt="" width="32" height="32"><span class="t-caption">운영체제</span><span class="t-label c-3 num">읽음 4 / 10</span></span>
                 <span class="tw"><span class="stack" data-b="rrrnuuuuu"></span><img src="../v2/illustrations/sym-db.png" alt="" width="32" height="32"><span class="t-caption">데이터베이스</span><span class="t-label c-3 num">읽음 <span class="n0">3</span><span class="n1">4</span> / 9</span></span>
                 <span class="tw"><span class="stack" data-b="uuuuuuuuu"></span><img src="../v2/illustrations/sym-net.png" alt="" width="32" height="32"><span class="t-caption">네트워크</span><span class="t-label c-3 num">읽음 0 / 9</span></span>
               </div>
-              <div class="rows revrow"><div class="row"><svg class="ic ri"><use href="#i-help"/></svg><div class="tx"><b>헷갈림 3문항 다시 보기</b></div><svg class="ic ri"><use href="#i-right"/></svg></div></div>
             </section>
             <div class="band"></div>
             <section class="sec"><div class="sh"><h2 class="t-head">자주 나온 질문</h2><span class="t-label c-a">전체 20</span></div>
               <div class="rows">
-                <div class="row"><span class="gl"></span><div class="tx"><b>Hash table에서 collision이 발생하면 어떻게 되나요? 해결방법에는 무엇이 있나요?</b><p class="meta t-label"><span class="tag star num"><svg class="ic f"><use href="#i-star"/></svg>4</span><span class="tag conf">헷갈림</span><span>자료구조 · 꼬리질문 2</span></p></div></div>
+                <div class="row"><span class="gl"></span><div class="tx"><b>Hash table에서 collision이 발생하면 어떻게 되나요? 해결방법에는 무엇이 있나요?</b><p class="meta t-label"><span class="tag star num"><svg class="ic f"><use href="#i-star"/></svg>4</span><span>자료구조 · 꼬리질문 2</span></p></div></div>
                 <div class="row"><span class="gl ing" style="--p:.67"></span><div class="tx"><b>Multi process에 대해서 설명해 주세요.</b><p class="meta t-label"><span class="tag star num"><svg class="ic f"><use href="#i-star"/></svg>4</span><span>운영체제 · 꼬리질문 4</span></p></div></div>
               </div>
             </section>
@@ -598,44 +721,113 @@ COMMIT;</code></pre></div>
 
         </div></div>
       </div>
-      <div class="lp-dots" role="group" aria-label="장면 고르기"><button type="button" aria-label="답 가리기"></button><button type="button" aria-label="읽은 만큼 칸"></button><button type="button" aria-label="블록 쌓기"></button><button type="button" aria-label="시뮬레이션"></button><button type="button" aria-label="헷갈림만 보기"></button></div>
-      <p class="lp-cap">답은 가려 두고, 먼저 떠올려요</p>
+      <div class="lp-ctl">
+        <div class="lp-dots" role="group" aria-label="장면 고르기"><button type="button" aria-label="답 가리기"></button><button type="button" aria-label="읽은 만큼 칸"></button><button type="button" aria-label="블록 쌓기"></button><button type="button" aria-label="시뮬레이션"></button><button type="button" aria-label="헷갈림만 보기"></button></div>
+        <!-- 자동 재생 멈춤(WCAG 2.2.2): 점은 멈추지 않으니(사용자 결정) 따로 둔다. 눌림이 멈춤 -->
+        <button type="button" class="lp-pause" aria-pressed="false" aria-label="자동 재생 멈춤"><svg class="ic off" aria-hidden="true"><use href="#i-pause"/></svg><svg class="ic on" aria-hidden="true"><use href="#i-play"/></svg></button>
+      </div>
+      <p class="lp-cap"></p>
     </div>
 
-    <ol class="lp-steps" role="list">
-      <li class="lp-step"><div class="in"><h2>답은 가려 두고, 먼저 떠올려요</h2><p>질문만 보고 핵심을 한두 문장으로 떠올려 보세요. 답 보기를 누르면 그때 열려요.</p></div></li>
-      <li class="lp-step"><div class="in"><h2>읽은 만큼 칸이 차요</h2><p>답은 단락으로 나뉘어 있어요. 내려 읽으면 위의 칸이 하나씩 차고, 닫았다 열어도 읽던 단락에서 이어져요.</p></div></li>
-      <li class="lp-step"><div class="in"><h2>다 읽은 질문은 블록으로 쌓여요</h2><p>과목마다 탑이 하나씩 있어요. 한 문항을 끝까지 읽을 때마다 한 칸씩 올라가요.</p></div></li>
-      <li class="lp-step"><div class="in"><h2>글로 어려운 건 움직여 봐요</h2><p>TCP 연결처럼 순서가 있는 개념은 시뮬레이션으로 한 단계씩 넘겨 봐요. 값을 직접 넣어 볼 수도 있어요.</p></div></li>
-      <li class="lp-step"><div class="in"><h2>헷갈린 것만 다시 모아요</h2><p>읽다가 헷갈려요를 눌러 두면, 목차에서 헷갈림만 골라 다시 읽을 수 있어요.</p></div></li>
+    <!-- 기능 5개: 컴퓨터는 붙은 폰이 장면을 보여 주고, 휴대폰은 걸음마다 앱 화면 조각(.lp-frag)을 함께 둔다. 묶음 제목은 휴대폰만 보인다 -->
+    <h2 class="lp-h2 lp-steps-h" id="h-steps">이렇게 공부해요</h2>
+    <ol class="lp-steps" role="list" aria-labelledby="h-steps">
+      <li class="lp-step"><div class="in"><h3>답은 가려 두고, 먼저 떠올려요</h3><p>질문만 보고 핵심을 한두 문장으로 떠올려 보세요. 답 보기를 누르면 그때 열려요.</p></div>
+        <div class="lp-frag rv"><div class="fs" data-reveal>
+          <div class="qh"><div class="top"><span class="t-label c-a">Transaction</span><span class="t-label c-3 num">9개 중 5번째</span></div><p class="t-title1 qt">Transaction을 간단히 설명해 주세요.</p></div>
+          <button type="button" class="recall" aria-label="답 보기"><span class="mid"><img src="../v2/illustrations/sym-db.png" alt="" width="48" height="48" loading="lazy"><span class="t-head">먼저 떠올려 보세요</span><span class="t-ui c-2">핵심을 한두 문장으로 정리해 본 뒤 답을 열어 보세요.</span></span><span class="btn l pri"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg>답 보기</span></button>
+          <div class="ans prose" tabindex="-1"><div class="coreh"><span class="t-label c-a">핵심</span></div><p class="t-core c-ink" style="margin:0"><mark>트랜잭션은 하나의 논리적 작업을 이루는 쿼리들의 묶음으로, DB 상태를 바꾸는 최소 작업 단위이다.</mark> 전부 성공하거나 전부 취소되어야 하고, 이를 ACID(원자성, 일관성, 고립성, 지속성)로 보장한다.</p></div>
+        </div></div></li>
+      <li class="lp-step"><div class="in"><h3>읽은 만큼 칸이 차요</h3><p>답은 단락으로 나뉘어 있어요. 내려 읽으면 위의 칸이 하나씩 차고, 닫았다 열어도 읽던 단락에서 이어져요.</p></div>
+        <div class="lp-frag rv" aria-hidden="true"><div class="fs">
+          <div class="card hero"><div class="strip"><img src="../v2/illustrations/hero-db.png" alt="" width="350" height="120" loading="lazy"></div><div class="bd"><p class="t-label c-a">데이터베이스 · Transaction</p><p class="t-title2">Transaction을 간단히 설명해 주세요.</p><div class="posr"><span class="seg"><i><b style="--f:1"></b></i><i><b style="--f:1"></b></i><i><b style="--f:1"></b></i><i><b></b></i><i><b></b></i><i><b></b></i></span><span class="t-label c-3 num">6단락 중 3번째</span></div></div></div>
+        </div></div></li>
+      <li class="lp-step"><div class="in"><h3>다 읽은 질문은 블록으로 쌓여요</h3><p>과목마다 탑이 하나씩 있어요. 한 문항을 끝까지 읽을 때마다 한 칸씩 올라가요.</p></div>
+        <div class="lp-frag rv" aria-hidden="true"><div class="fs">
+          <div class="sh" style="margin:0 20px 12px"><p class="t-head">과목 진도</p><p class="sum"><span class="t-label c-3">읽음&nbsp;</span><b class="t-display c-a num">18</b><span class="t-label c-3 num">&nbsp;/ 40</span></p></div>
+          <div class="towers">
+            <span class="tw"><span class="stack" data-b="rrrrrrrrrruu"></span><img src="../v2/illustrations/sym-ds.png" alt="" width="32" height="32" loading="lazy"><span class="t-caption">자료구조</span><span class="t-label c-3 num">읽음 10 / 12</span></span>
+            <span class="tw"><span class="stack" data-b="rrrriuuuuu"></span><img src="../v2/illustrations/sym-os.png" alt="" width="32" height="32" loading="lazy"><span class="t-caption">운영체제</span><span class="t-label c-3 num">읽음 4 / 10</span></span>
+            <span class="tw"><span class="stack" data-b="rrrruuuuu"></span><img src="../v2/illustrations/sym-db.png" alt="" width="32" height="32" loading="lazy"><span class="t-caption">데이터베이스</span><span class="t-label c-3 num">읽음 4 / 9</span></span>
+            <span class="tw"><span class="stack" data-b="uuuuuuuuu"></span><img src="../v2/illustrations/sym-net.png" alt="" width="32" height="32" loading="lazy"><span class="t-caption">네트워크</span><span class="t-label c-3 num">읽음 0 / 9</span></span>
+          </div>
+        </div></div></li>
+      <li class="lp-step"><div class="in"><h3>글로 어려운 건 움직여 봐요</h3><p>TCP 연결처럼 순서가 있는 개념은 시뮬레이션 30개로 한 단계씩 넘겨 봐요. 값을 직접 넣어 볼 수도 있어요.</p></div>
+        <div class="lp-frag rv" aria-hidden="true"><div class="fs">
+          <div class="stg">
+            <div class="node c"><svg class="ic"><use href="#i-desk"/></svg><b class="t-label">클라이언트</b><span class="st ok">ESTABLISHED</span></div>
+            <div class="node s"><svg class="ic"><use href="#i-server"/></svg><b class="t-label">서버</b><span class="st ok">ESTABLISHED</span></div>
+            <i class="life c"></i><i class="life s"></i>
+            <div class="arr r on" style="top:156px"><span class="lb"><b>SYN</b><small>seq=100</small></span><i class="ln"></i></div>
+            <div class="arr l on" style="top:224px"><span class="lb"><b>SYN+ACK</b><small>seq=300 ack=101</small></span><i class="ln"></i></div>
+            <div class="arr r on" style="top:292px"><span class="lb"><b>ACK</b><small>ack=301</small></span><i class="ln"></i></div>
+          </div>
+          <div class="simcap"><div class="posr" style="margin:0"><span class="seg"><i><b style="--f:1"></b></i><i><b style="--f:1"></b></i><i><b style="--f:1"></b></i><i><b style="--f:1"></b></i><i><b></b></i></span><span class="t-label c-3 num">5단계 중 4번째</span></div><p class="t-read c-ink">클라이언트가 ACK를 보내요. 서버 번호를 받았다는 확인이고, 양쪽이 ESTABLISHED가 돼요.</p></div>
+        </div></div></li>
+      <li class="lp-step"><div class="in"><h3>헷갈린 것만 다시 모아요</h3><p>읽다가 헷갈려요를 눌러 두면, 목차에서 헷갈림만 골라 다시 읽을 수 있어요.</p></div>
+        <div class="lp-frag rv" aria-hidden="true"><div class="fs cf">
+          <div class="segbar"><div class="segc t-ui num" style="--n:3"><span class="all">전체 40</span><span>빈출 20</span><span class="cnf">헷갈림만 3</span><i class="th"></i></div></div>
+          <div class="p-conf">
+            <div class="confsum"><p class="sum"><b class="t-display num">3</b><span class="t-label c-3">문항</span></p><p class="t-ui c-2">이해했다면 질문 아래에서 헷갈림을 꺼 주세요</p></div>
+            <div class="row"><span class="gl done"><svg class="ic"><use href="#i-check"/></svg></span><div class="tx"><b>Array와 Linked List를 비교해서 설명해 주세요.</b><p class="meta t-label"><span class="tag star num"><svg class="ic f"><use href="#i-star"/></svg>1</span><span>자료구조 · 꼬리질문 3</span></p></div></div>
+            <div class="row"><span class="gl ing" style="--p:.17"></span><div class="tx"><b>Multi process/thread 환경에서 동기화 문제를 어떻게 해결하나요?</b><p class="meta t-label"><span class="tag star num"><svg class="ic f"><use href="#i-star"/></svg>1</span><span>운영체제 · 꼬리질문 1</span></p></div></div>
+          </div>
+        </div></div></li>
     </ol>
   </div>
 
   <section class="lp-sec lp-subj" aria-labelledby="h-subj">
     <div class="lp-wrap">
-      <h2 class="lp-h2" id="h-subj">네 과목, 40문항</h2>
-      <p class="lp-lead">질문 하나가 블록 한 칸이에요. 끝까지 읽은 질문은 칸이 파랗게 차요.</p>
-      <ul>
-        <li><img src="../v2/illustrations/sym-ds.png" alt="" width="48" height="48"><div><h3>자료구조</h3><p class="meta">12문항 · 시뮬레이션 7개</p><p class="tp">Array와 Linked List, Queue와 Stack, Hash table과 BST</p></div><span class="brow" data-b="uuuuuuuuuuuu" aria-hidden="true"></span></li>
-        <li><img src="../v2/illustrations/sym-os.png" alt="" width="48" height="48"><div><h3>운영체제</h3><p class="meta">10문항 · 시뮬레이션 10개</p><p class="tp">Process와 Thread, Memory</p></div><span class="brow" data-b="uuuuuuuuuu" aria-hidden="true"></span></li>
-        <li><img src="../v2/illustrations/sym-db.png" alt="" width="48" height="48"><div><h3>데이터베이스</h3><p class="meta">9문항 · 시뮬레이션 6개</p><p class="tp">DB 구조와 설계, Transaction, Index</p></div><span class="brow" data-b="uuuuuuuuu" aria-hidden="true"></span></li>
-        <li><img src="../v2/illustrations/sym-net.png" alt="" width="48" height="48"><div><h3>네트워크</h3><p class="meta">9문항 · 시뮬레이션 7개</p><p class="tp">TCP/IP, HTTP, Authorization</p></div><span class="brow" data-b="uuuuuuuuu" aria-hidden="true"></span></li>
+      <h2 class="lp-h2" id="h-subj">자료구조부터 네트워크까지</h2>
+      <p class="lp-lead">과목마다 이런 질문을 짧은 해설로 읽어요.</p>
+      <!-- 섹션 머리 숫자: 실제 수치만(문항 40, 시뮬레이션 30, 과목 4, 빈출 20 = notes.json 의 stars > 0). 아래 과목 내역이 풀어 보여 준다 -->
+      <ul class="nums" role="list">
+        <li><p class="v"><b class="num">40</b>문항</p><p class="k">짧은 해설과 꼬리질문</p></li>
+        <li><p class="v"><b class="num">30</b>개</p><p class="k">움직여 보는 시뮬레이션</p></li>
+        <li><p class="v"><b class="num">4</b>과목</p><p class="k">과목마다 진도가 따로 쌓여요</p></li>
+        <li><p class="v"><b class="num">20</b>문항</p><p class="k">자주 나온 질문은 따로 모아 봐요</p></li>
       </ul>
+      <!-- 질문 제목은 app/data/notes.json 의 title 그대로(과목마다 2개, 나머지는 외 n문항). 누르면 앱의 그 질문(#/q/<id>) -->
+      <ul class="subs rv">
+        <li><img src="../v2/illustrations/sym-ds.png" alt="" width="48" height="48" loading="lazy"><div><h3>자료구조</h3><p class="meta">12문항 · 시뮬레이션 7개</p><p class="tp">Array와 Linked List, Queue와 Stack, Hash table과 BST</p><ul class="qs"><li><a href="./app/#/q/ds-array-vs-ll">Array와 Linked List를 비교해서 설명해 주세요.<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></a></li><li><a href="./app/#/q/ds-stack-queue">Stack 두 개를 이용하여 Queue를 구현해 보세요.<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></a></li></ul><p class="more">외 10문항</p></div></li>
+        <li><img src="../v2/illustrations/sym-os.png" alt="" width="48" height="48" loading="lazy"><div><h3>운영체제</h3><p class="meta">10문항 · 시뮬레이션 10개</p><p class="tp">Process와 Thread, Memory</p><ul class="qs"><li><a href="./app/#/q/os-mp-vs-mt">multi process와 multi thread를 비교 설명해 주세요.<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></a></li><li><a href="./app/#/q/os-virtual-memory">가상 메모리에 대해서 설명해 주세요.<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></a></li></ul><p class="more">외 8문항</p></div></li>
+        <li><img src="../v2/illustrations/sym-db.png" alt="" width="48" height="48" loading="lazy"><div><h3>데이터베이스</h3><p class="meta">9문항 · 시뮬레이션 6개</p><p class="tp">DB 구조와 설계, Transaction, Index</p><ul class="qs"><li><a href="./app/#/q/db-transaction">Transaction을 간단히 설명해 주세요.<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></a></li><li><a href="./app/#/q/db-index-column">index를 어느 column에 사용하는 것이 좋을까요?<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></a></li></ul><p class="more">외 7문항</p></div></li>
+        <li><img src="../v2/illustrations/sym-net.png" alt="" width="48" height="48" loading="lazy"><div><h3>네트워크</h3><p class="meta">9문항 · 시뮬레이션 7개</p><p class="tp">TCP/IP, HTTP, Authorization</p><ul class="qs"><li><a href="./app/#/q/net-tcp-udp">TCP vs UDP를 비교해서 설명해 주세요.<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></a></li><li><a href="./app/#/q/net-handshake">3-way handshake는 무엇이고 각 과정은 어떻게 되나요?<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></a></li></ul><p class="more">외 7문항</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 자주 묻는 질문: 시작 전에 막히는 것만. 버튼을 누르면 aria-expanded 로 답이 열리고 닫힌다 -->
+  <section class="lp-sec lp-faq" aria-labelledby="h-faq">
+    <div class="lp-wrap">
+      <h2 class="lp-h2" id="h-faq">자주 묻는 질문</h2>
+      <div class="list">
+        <div class="qa"><h3><button type="button" id="q-1" aria-expanded="false" aria-controls="a-1">정말 무료인가요?<svg class="ic" aria-hidden="true"><use href="#i-down"/></svg></button></h3><div class="fa" id="a-1" role="region" aria-labelledby="q-1"><div><p>네, 무료예요. 40문항 해설과 시뮬레이션 30개를 모두 볼 수 있어요.</p></div></div></div>
+        <div class="qa"><h3><button type="button" id="q-2" aria-expanded="false" aria-controls="a-2">가입해야 하나요?<svg class="ic" aria-hidden="true"><use href="#i-down"/></svg></button></h3><div class="fa" id="a-2" role="region" aria-labelledby="q-2"><div><p>아니요. 가입도 설치도 없이 휴대폰 브라우저에서 바로 열려요.</p></div></div></div>
+        <div class="qa"><h3><button type="button" id="q-3" aria-expanded="false" aria-controls="a-3">공부 기록은 어디에 남나요?<svg class="ic" aria-hidden="true"><use href="#i-down"/></svg></button></h3><div class="fa" id="a-3" role="region" aria-labelledby="q-3"><div><p>지금 쓰는 기기의 브라우저에만 남아요. 다른 기기에서는 처음부터 시작하고, 브라우저 데이터를 지우면 기록도 함께 지워져요.</p></div></div></div>
+        <div class="qa"><h3><button type="button" id="q-4" aria-expanded="false" aria-controls="a-4">인터넷이 없어도 볼 수 있나요?<svg class="ic" aria-hidden="true"><use href="#i-down"/></svg></button></h3><div class="fa" id="a-4" role="region" aria-labelledby="q-4"><div><p>시작하기로 앱을 한 번 열어 두면, 그다음부터는 인터넷이 없어도 앱에서 본문과 시뮬레이션을 볼 수 있어요. 이 소개 페이지는 인터넷이 있어야 열려요.</p></div></div></div>
+      </div>
     </div>
   </section>
 
   <section class="lp-sec lp-end" aria-labelledby="h-end">
     <div class="lp-wrap">
-      <h2 class="lp-h2" id="h-end">오늘 한 문항부터 쌓아 봐요</h2>
-      <p class="lp-lead">무료예요. 가입도 설치도 없이 휴대폰 브라우저에서 바로 열려요. 읽은 기록은 이 기기에만 남아요.</p>
-      <a class="btn l pri" href="./app/">시작하기</a>
+      <img class="rv" src="photos/photo-3.webp" alt="버스 창가에서 휴대폰으로 공부하는 사람의 뒷모습" width="1170" height="1500" loading="lazy">
+      <div>
+        <h2 class="lp-h2" id="h-end">오늘 한 문항부터 쌓아 봐요</h2>
+        <p class="lp-lead">한 문항은 대부분 4분이면 다 읽어요.</p>
+        <a class="btn l pri" href="./app/" data-end-cta>시작하기</a>
+      </div>
     </div>
   </section>
 </main>
 
 <footer class="lp-foot">
-  <div class="lp-wrap"><span class="lp-brand"><svg class="mark" aria-hidden="true"><use href="#mark"/></svg><span class="t-label">CS 차곡</span></span><span class="t-label">CS 전공 개념을 짧은 해설과 시뮬레이션으로 공부하는 웹앱</span></div>
+  <div class="lp-wrap"><span class="lp-brand"><svg class="mark" aria-hidden="true"><use href="#mark"/></svg><span class="t-label">CS 차곡</span></span><span class="t-label">CS 전공 개념을 짧은 해설과 시뮬레이션으로 공부해요</span></div>
 </footer>
+
+<!-- 하단 고정 시작하기(휴대폰): 첫 시작하기가 안 보이고 끝 시작하기도 안 보일 때만 올라온다 -->
+<div class="lp-dock"><a class="btn l pri" href="./app/">시작하기</a></div>
 
 <script>
 // 블록 줄: data-b 글자 하나가 블록 하나 (r 읽음, R 읽음+헷갈림, i 읽는 중, n 읽는 중이었다가 쌓일 칸, u 안 읽음, C 안 읽음+헷갈림)
@@ -647,7 +839,9 @@ document.querySelectorAll('[data-b]').forEach(el => {
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const desk = matchMedia('(min-width: 960px)');
 const $ = (s, el = document) => el.querySelector(s);
-const device = $('.lp-device'), nav = $('.lp-nav'), steps = [...document.querySelectorAll('.lp-step')];
+const device = $('.lp-device'), pin = $('.lp-pin'), nav = $('.lp-nav'), steps = [...document.querySelectorAll('.lp-step')];
+// iOS 사파리는 touchstart 듣기가 하나도 없으면 :active 누름 반응을 안 쓴다
+addEventListener('touchstart', () => {}, { passive: true });
 
 // 타임라인: [ms, 함수] 목록. 움직임 줄이기면 모두 바로 실행해 끝 상태 그림만 남긴다
 let timers = [];
@@ -696,35 +890,37 @@ const SCENES = [
   () => show('home'),
   () => {
     qReset(); show('q');
-    play([[800, () => tap($('[data-tap]', Q))], [960, () => Q.classList.add('fade')], [1080, () => { Q.classList.add('rev'); fill(qSegs, 0, .4); }]]);
+    if (!RM) play([[1500, () => tap($('[data-tap]', Q))], [1660, () => Q.classList.add('fade')], [1780, () => { Q.classList.add('rev'); fill(qSegs, 0, .4); }]]);
   },
   () => {
     // 다른 화면에서 바로 왔으면(점 누름 등) 답 맨 위에서 시작한다. 전에 끝까지 내린 자리가 비치지 않게
     if (!Q.classList.contains('on')) still(Q, () => { setY(0); fill(qSegs, 0, .4); });
     show('q'); Q.classList.remove('fade'); Q.classList.add('rev');
     const stops = qStops();
-    const list = stops.map((y, k) => [300 + k * 760, () => { setY(y); fill(qSegs, k + 1, k + 1 < qSegs.length ? .35 : 0); }]);
+    const list = stops.map((y, k) => [300 + k * 640, () => { setY(y); fill(qSegs, k + 1, k + 1 < qSegs.length ? .35 : 0); }]);
     play(RM ? list.slice(0, 2) : list);
   },
   () => {
     const tw = $('#tw'); tw.classList.remove('built', 'plus'); void tw.offsetWidth; show('tw');
     tw.classList.add('built');
-    play([[1400, () => tw.classList.add('plus')]]);
+    play([[1700, () => tw.classList.add('plus')]]); // 가장 높은 탑(12칸)의 블록이 다 떨어진 뒤(60ms x 11 + 240 = 0.9초, CSS 지연은 SP 로 안 줄어듦)
   },
   () => {
     simStep(0); show('sim');
     const next = $('[data-tap]', SIM);
-    play([1, 2, 3].flatMap(k => [[k * 1400 - 450, () => tap(next)], [k * 1400 - 300, () => simStep(k)]]));
+    play([1, 2, 3].flatMap(k => [[k * 1100 - 450, () => tap(next)], [k * 1100 - 300, () => simStep(k)]]));
   },
   () => {
     const q2 = $('#q2'), toc = $('#toc');
     q2.classList.remove('conf'); toc.classList.remove('cf'); show('q2');
-    play([[700, () => tap($('[data-tap]', q2))], [860, () => q2.classList.add('conf')], [2500, () => show('toc')], [3200, () => tap($('[data-tap]', toc))], [3360, () => toc.classList.add('cf')]]);
+    // 컴퓨터는 SP 1 이라 거르기까지 더 당긴다(보통 속도로 내려도 결과가 보이게, 디자인 2회차)
+    const [t1, t2, t3] = SP < 1 ? [2000, 2500, 2660] : [1600, 2100, 2260];
+    play([[700, () => tap($('[data-tap]', q2))], [860, () => q2.classList.add('conf')], [t1, () => show('toc')], [t2, () => tap($('[data-tap]', toc))], [t3, () => toc.classList.add('cf')]]);
   },
 ];
 let cur = -1;
 const dots = [...document.querySelectorAll('.lp-dots button')], capEl = $('.lp-cap');
-const TITLES = steps.map(s => $('h2', s).textContent);
+const TITLES = steps.map(s => $('h3', s).textContent);
 function setScene(n) {
   if (n === cur) return;
   cur = n; timers.forEach(clearTimeout); timers = [];
@@ -736,20 +932,32 @@ function setScene(n) {
 const replay = n => { cur = -1; setScene(n); };
 
 // 좁은 화면 자동 재생: 장면 움직임이 끝나면(DUR) 잠깐 멈췄다가(HOLD) 다음 장면, 5 다음은 1. 움직임 줄이기면 자동 재생 없이 점으로만
-const DUR = [0, 1100, 4100, 1700, 4000, 3400].map(v => v * SP), HOLD = 500;
-let auto = false, autoT = 0;
+// 장면의 결과(펼친 답, 다 찬 칸, +1 블록, ESTABLISHED, 헷갈림만 목록)가 0.8초 넘게 보이게: 마지막 움직임 + 약 0.85초 뒤 다음(디자인 2회차)
+// 멈춤 버튼이 눌렸거나(paused), 폰이 화면 밖이거나(away), 탭이 안 보이면 다음 장면으로 넘기지 않는다
+const DUR = [0, 1900, 3600, 1800, 3100, 2800].map(v => v * SP), HOLD = 800;
+let auto = false, autoT = 0, paused = false, away = false;
 function autoplay(n) {
   clearTimeout(autoT); replay(n);
-  if (auto) autoT = setTimeout(() => autoplay(n % 5 + 1), DUR[n] + HOLD);
+  if (auto && !paused && !away && !document.hidden) autoT = setTimeout(() => autoplay(n % 5 + 1), DUR[n] + HOLD);
 }
-// 점: 그 장면을 처음부터 끝까지 보여 주고, 자동 재생은 거기서부터 이어진다
+// 쉬기: 장면 안 움직임까지 끊는다. 깨기: 그 장면 처음부터 이어서(멈춤 버튼이 눌려 있으면 그대로)
+const sleep = () => { clearTimeout(autoT); timers.forEach(clearTimeout); timers = []; };
+const wake = () => { if (cur > 0 && !paused && !away && !document.hidden) autoplay(cur); };
+// 점: 그 장면을 처음부터 끝까지 보여 주고, 자동 재생은 거기서부터 이어진다. 폰을 눌러도 다음 장면(좁은 화면)
 dots.forEach((d, i) => d.addEventListener('click', () => autoplay(i + 1)));
-// 탭이 안 보이면 멈추고, 다시 보이면 그 장면부터 이어서
-document.addEventListener('visibilitychange', () => {
-  if (cur < 0) return;
-  clearTimeout(autoT); timers.forEach(clearTimeout); timers = [];
-  if (!document.hidden) autoplay(cur);
+device.addEventListener('click', () => desk.matches || autoplay(cur % 5 + 1));
+// 멈춤 버튼: 지금 장면은 끝까지 두고 다음으로 안 넘긴다. 다시 누르면 그 장면부터 이어서
+const pauseBtn = $('.lp-pause');
+pauseBtn.addEventListener('click', () => {
+  paused = !paused; pauseBtn.setAttribute('aria-pressed', paused);
+  paused ? clearTimeout(autoT) : wake();
 });
+document.addEventListener('visibilitychange', () => document.hidden ? sleep() : wake());
+// 폰(점, 한 줄 포함)이 화면 밖이면 쉬고, 다시 들어오면 이어서(좁은 화면만. 넓은 화면은 폰이 붙어 있음)
+new IntersectionObserver(([e]) => {
+  const off = !desk.matches && !e.isIntersecting;
+  if (off !== away) { away = off; away ? sleep() : wake(); }
+}).observe(pin);
 
 // 넓은 화면 장면 기준선: 화면 가운데에 걸친 걸음이 지금 장면
 let io, line = 0, lastW = 0;
@@ -760,14 +968,25 @@ function onHit(es) {
 }
 // 폰 크기: 넓은 화면은 화면 높이에 맞추고, 좁은 화면은 폰 아래 점과 한 줄(98)까지 한 화면에 들어가게 폰만 줄인다.
 // 0.2 아래로는 안 줄인다(가로로 든 휴대폰처럼 아주 낮은 화면은 스크롤)
+// 좁은 화면: 폰 위(제목~시작하기)와 폰 아래(점, 한 줄)의 실제 높이를 빼고 남은 만큼. 폰 폭 120(MIN) 아래로는 안 줄이고 아래를 자른다
+const MIN = .293; // 폰 폭 120
 function fit() {
-  const s = desk.matches ? Math.min(.84, (innerHeight - 136) / 864) : Math.min(.66, Math.max(.2, (innerHeight - device.offsetTop - 98) / 864));
-  device.style.setProperty('--s', (Math.floor(s * 1000) / 1000).toFixed(3));
+  // 레이아웃 값(offset)으로 잰다: 등장 움직임(translateY) 중에도 같은 값
+  const below = pin.offsetTop + pin.offsetHeight - device.offsetTop - device.offsetHeight;
+  const room = innerHeight - device.offsetTop - below - 8;
+  const s = Math.floor((desk.matches ? Math.min(.84, (innerHeight - 136) / 864) : Math.min(.66, Math.max(MIN, room / 864))) * 1000) / 1000;
+  const cut = !desk.matches && room < 864 * s;
+  device.style.setProperty('--s', s.toFixed(3));
+  device.classList.toggle('cut', cut);
+  device.style.height = cut ? `${Math.max(room, 864 * s * .7)}px` : '';
+  // 휴대폰 기능 조각: 390 폭 앱 화면을 판 안쪽 폭(화면 폭 - 80)에 맞춰 줄인다
+  document.documentElement.style.setProperty('--fz', Math.min(1, (innerWidth - 80) / 390).toFixed(3));
 }
 function layout() {
   fit();
   if (io) io.disconnect();
   hit.clear(); clearTimeout(autoT);
+  device.setAttribute('aria-label', desk.matches ? 'CS 차곡 앱 화면 미리보기. 왼쪽 설명에 맞춰 화면이 바뀌어요' : 'CS 차곡 앱 화면이 자동으로 바뀌는 미리보기. 누르면 다음 장면으로 넘어가요');
   if (desk.matches) {
     auto = false; line = Math.round(innerHeight / 2);
     io = new IntersectionObserver(onHit, { rootMargin: `${-line}px 0px ${line + 1 - innerHeight}px 0px` });
@@ -784,8 +1003,31 @@ new IntersectionObserver(() => desk.matches && onHit([])).observe($('.lp-intro')
 document.fonts.ready.then(fit);
 addEventListener('resize', () => { if (innerWidth !== lastW) { lastW = innerWidth; layout(); } });
 
-// 머리의 시작하기: 첫 화면의 시작하기가 보이는 동안은 숨겨 같은 버튼이 두 번 보이지 않게
-new IntersectionObserver(([e]) => nav.classList.toggle('cta-on', !e.isIntersecting), { rootMargin: '-64px 0px 0px 0px' }).observe($('[data-hero-cta]'));
+// 머리의 시작하기(컴퓨터)와 하단 고정 시작하기(휴대폰): 첫 시작하기가 화면 밖일 때만 보인다.
+// 하단 버튼은 끝 시작하기가 보이면 다시 숨겨 같은 버튼이 두 번 보이지 않게
+const dock = $('.lp-dock');
+let heroOff = false, endIn = false;
+const dockSync = () => { dock.classList.toggle('on', heroOff && !endIn); nav.classList.toggle('cta-on', heroOff && !endIn); };
+new IntersectionObserver(([e]) => { heroOff = !e.isIntersecting; dockSync(); }, { rootMargin: `-${nav.offsetHeight}px 0px 0px 0px` }).observe($('[data-hero-cta]'));
+new IntersectionObserver(([e]) => { endIn = e.isIntersecting; dockSync(); }).observe($('[data-end-cta]'));
+// 하단 버튼 바탕: 화면 아래 12% 띠에 회색 과목 섹션이 걸리면 회색
+new IntersectionObserver(([e]) => dock.classList.toggle('gray', e.isIntersecting), { rootMargin: '-88% 0px 0px 0px' }).observe($('.lp-subj'));
+
+// 자주 묻는 질문: 눌러서 열고 닫는다(답 칸은 CSS 가 aria-expanded 를 보고 연다). 열린 답이 화면 아래(하단 고정 버튼 밑)에 걸리면 올려 보인다
+document.querySelectorAll('.qa button').forEach(b => b.addEventListener('click', () => {
+  const open = b.getAttribute('aria-expanded') !== 'true';
+  b.setAttribute('aria-expanded', open);
+  if (open) setTimeout(() => b.closest('.qa').scrollIntoView({ block: 'nearest', behavior: RM ? 'auto' : 'smooth' }), 260);
+}));
+
+// 걸음 1 조각: 답 보기를 누르면 그 자리에서 답 첫 단락이 열린다
+document.querySelectorAll('[data-reveal] .recall').forEach(b => b.addEventListener('click', () => {
+  const fs = b.closest('[data-reveal]'); fs.classList.add('rev'); $('.ans', fs).focus({ preventScroll: true });
+}));
+
+// 그림(기능 조각, 과목 목록, 사진)은 화면에 들어올 때 한 번 올라온다
+const rv = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('shown'); rv.unobserve(e.target); } }), { rootMargin: '0px 0px -10% 0px' });
+document.querySelectorAll('.rv').forEach(el => rv.observe(el));
 
 // 로고: 다시 불러오지 않고 맨 위로 돌아간다
 $('a.lp-brand').addEventListener('click', e => { e.preventDefault(); scrollTo({ top: 0, behavior: RM ? 'auto' : 'smooth' }); });

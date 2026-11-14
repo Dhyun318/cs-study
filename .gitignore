@@ -21,3 +21,5 @@ node_modules/
 # 랜딩 사진 후보 원본(용량 큼, 고른 것만 photos/*.webp 로 올림)
 design/landing/photos/candidates/
 design/landing/photos/contact.png
+# 랜딩 레퍼런스 스크린샷(제3자 사이트, 공개 레포에 올리지 않음)
+design/landing/_refs/
