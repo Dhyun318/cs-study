@@ -1102,7 +1102,8 @@ MOVES.set($('.nums'), [() => {
   };
   numF = requestAnimationFrame(step);
 }]]]);
-if (!RM) {
+// 움직임 줄이기여도 화면에 들어오면 내용은 바뀐다(밀려 오는 움직임만 CSS 에서 끔). 2026-11-15 사용자: 휴대폰에서 스크롤 모션이 안 나옴
+{
   const live = new Map();
   // 처음 상태로는 바로 간다(되돌리는 전환도 화면 밖에서 돌지 않게 끝내 버림)
   const toStart = el => { MOVES.get(el)[0](el); el.getAnimations({ subtree: true }).forEach(a => a.finish()); };
